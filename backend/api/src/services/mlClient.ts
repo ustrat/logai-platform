@@ -7,7 +7,10 @@ class MLServiceClient {
   private client: AxiosInstance;
 
   constructor() {
-    this.client = axios.create({
+    // this.client = axios.create({
+    //   baseURL: config.mlService.url,
+      console.log('ML Service URL:', config.mlService.url);
+      this.client = axios.create({
       baseURL: config.mlService.url,
       timeout: 30000,  // ML inference can take a moment
       headers: { 'Content-Type': 'application/json' },
@@ -18,7 +21,8 @@ class MLServiceClient {
     try {
       const res = await this.client.get('/health');
       return res.data?.status === 'ok';
-    } catch {
+    } catch (err: any) {
+      console.error('Error occurred while checking ML service health:', err.message);
       return false;
     }
   }
