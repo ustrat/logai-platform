@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: logai-ml-service
+  labels:
+    app: logai-ml-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: logai-ml-service
+  template:
+    metadata:
+      labels:
+        app: logai-ml-service
+    spec:
+      containers:
+        - name: ml-service
+          image: 803283181205.dkr.ecr.us-east-1.amazonaws.com/logai-ml-service:latest
+          ports:
+            - containerPort: 8000
+          env:
+            - name: PYTHONUNBUFFERED
+              value: "1"
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "900Mi"
+              cpu: "500m"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: logai-ml-service
+spec:
+  selector:
+    app: logai-ml-service
+  ports:
+    - port: 8000
+      targetPort: 8000
+  type: ClusterIP
