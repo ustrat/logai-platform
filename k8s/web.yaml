@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: web
-          image: 803283181205.dkr.ecr.us-east-1.amazonaws.com/logai-web:latest
+          image: 803283181205.dkr.ecr.us-east-2.amazonaws.com/logai-web:latest
           ports:
             - containerPort: 80
           resources:

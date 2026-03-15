@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: ml-service
-          image: 803283181205.dkr.ecr.us-east-1.amazonaws.com/logai-ml-service:latest
+          image: 803283181205.dkr.ecr.us-east-2.amazonaws.com/logai-ml-service:latest
           ports:
             - containerPort: 8000
           env:

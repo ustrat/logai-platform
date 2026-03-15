@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { mlClient } from '../services/mlclient';
+import { mlClient } from '../services/mlClient';
 import { ApiResponse } from '../schemas/types';
 import { logger } from '../config/logger';
 

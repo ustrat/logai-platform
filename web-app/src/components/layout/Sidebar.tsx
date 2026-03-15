@@ -25,7 +25,7 @@ export default function Sidebar() {
       <div style={styles.logo}>
         <span style={styles.logoMark}>⬡</span>
         <div>
-          <div style={styles.logoText}>LOGAI</div>
+          <div style={styles.logoText}>VALUEPOINT</div>
           <div style={styles.logoSub}>v1.0.0</div>
         </div>
       </div>

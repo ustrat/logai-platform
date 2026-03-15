@@ -1,0 +1,13 @@
+{
+  "ImageRepository": {
+    "ImageIdentifier": "803283181205.dkr.ecr.us-east-2.amazonaws.com/logai-web:latest",
+    "ImageConfiguration": {
+      "Port": "80"
+    },
+    "ImageRepositoryType": "ECR"
+  },
+  "AuthenticationConfiguration": {
+    "AccessRoleArn": "arn:aws:iam::803283181205:role/AppRunnerECRRole"
+  },
+  "AutoDeploymentsEnabled": false
+}

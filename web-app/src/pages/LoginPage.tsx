@@ -36,7 +36,7 @@ export default function LoginPage() {
         <div style={styles.logo}>
           <div style={styles.logoMark}>⬡</div>
           <div>
-            <div style={styles.logoText}>LOGAI</div>
+            <div style={styles.logoText}>VALUEPOINT</div>
             <div style={styles.logoSub}>TRANSACTION INTELLIGENCE</div>
           </div>
         </div>
