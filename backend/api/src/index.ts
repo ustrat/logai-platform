@@ -8,6 +8,7 @@ import { errorHandler, notFound } from './middleware/errorHandler';
 import { mlClient } from './services/mlClient';
 import authRoutes from './routes/auth';
 import inferenceRoutes from './routes/inference';
+import plaidRoutes from './routes/plaid';
 
 const app = express();
 
@@ -35,6 +36,7 @@ app.get('/health', async (_req, res) => {
 
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/inference', inferenceRoutes);
+app.use('/api/v1/plaid', plaidRoutes);
 
 // ── Error handling ────────────────────────────────────────────
 app.use(notFound);

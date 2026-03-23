@@ -76,7 +76,7 @@ export default function LoginPage() {
         </form>
 
         <div style={styles.footer}>
-          LOGAI PLATFORM v1.0 · SECURE CONNECTION
+          VALUEPOINT PLATFORM v1.0 · SECURE CONNECTION
         </div>
       </div>
     </div>
@@ -123,7 +123,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   logoText: {
     fontFamily: 'var(--font-display)',
-    fontSize: '28px',
+    fontSize: '20px',
     fontWeight: 800,
     color: 'var(--text-primary)',
     letterSpacing: '4px',

@@ -1,6 +1,7 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
-import { LayoutDashboard, AlertTriangle, TrendingUp, Settings, LogOut, Activity } from 'lucide-react';
+import { LayoutDashboard, AlertTriangle, TrendingUp, Settings, LogOut, Activity, ChevronLeft, ChevronRight, RefreshCw, CreditCard } from 'lucide-react';
+import { List, Briefcase, Eye } from 'lucide-react';
 
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'DASHBOARD' },
@@ -8,9 +9,19 @@ const navItems = [
   { to: '/patterns', icon: TrendingUp, label: 'PATTERNS' },
   { to: '/monitor', icon: Activity, label: 'MONITOR' },
   { to: '/settings', icon: Settings, label: 'SETTINGS' },
+  { to: '/renewals', icon: RefreshCw, label: 'RENEWALS' },
+  { to: '/risk-queue', icon: List,      label: 'RISK QUEUE' },
+  { to: '/case-feed',  icon: Briefcase, label: 'CASE FEED' },
+  { to: '/watchlist',  icon: Eye,       label: 'WATCHLIST' },
+  { to: '/plaid',  icon: CreditCard,       label: 'PLAID' },
 ];
 
-export default function Sidebar() {
+interface SidebarProps {
+  collapsed: boolean;
+  onToggle: () => void;
+}
+
+export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
 
@@ -20,23 +31,42 @@ export default function Sidebar() {
   };
 
   return (
-    <aside style={styles.sidebar}>
+    <aside style={{ ...styles.sidebar, width: collapsed ? '60px' : '200px' }}>
+      {/* Toggle button */}
+      <button onClick={onToggle} style={styles.toggleBtn} title={collapsed ? 'Expand' : 'Collapse'}>
+        {collapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+      </button>
+
       {/* Logo */}
-      <div style={styles.logo}>
-        <span style={styles.logoMark}>⬡</span>
-        <div>
-          <div style={styles.logoText}>VALUEPOINT</div>
-          <div style={styles.logoSub}>v1.0.0</div>
+      {!collapsed && (
+        <div style={styles.logo}>
+          <span style={styles.logoMark}>⬡</span>
+          <div>
+            <div style={styles.logoText}>VALUEPOINT</div>
+            <div style={styles.logoSub}>v1.0.0</div>
+          </div>
         </div>
-      </div>
+      )}
+      {collapsed && (
+        <div style={styles.logoCollapsed}>
+          <span style={styles.logoMark}>⬡</span>
+        </div>
+      )}
 
       <div style={styles.divider} />
 
       {/* Status indicator */}
-      <div style={styles.status}>
-        <div style={styles.statusDot} />
-        <span style={styles.statusText}>SYSTEM ONLINE</span>
-      </div>
+      {!collapsed && (
+        <div style={styles.status}>
+          <div style={styles.statusDot} />
+          <span style={styles.statusText}>SYSTEM ONLINE</span>
+        </div>
+      )}
+      {collapsed && (
+        <div style={styles.statusCollapsed}>
+          <div style={styles.statusDot} />
+        </div>
+      )}
 
       <div style={styles.divider} />
 
@@ -50,10 +80,13 @@ export default function Sidebar() {
             style={({ isActive }) => ({
               ...styles.navItem,
               ...(isActive ? styles.navItemActive : {}),
+              justifyContent: collapsed ? 'center' : 'flex-start',
+              padding: collapsed ? '9px' : '9px 12px',
             })}
+            title={collapsed ? label : undefined}
           >
             <Icon size={14} />
-            <span>{label}</span>
+            {!collapsed && <span>{label}</span>}
           </NavLink>
         ))}
       </nav>
@@ -62,11 +95,13 @@ export default function Sidebar() {
 
       {/* User */}
       <div style={styles.divider} />
-      <div style={styles.user}>
-        <div style={styles.userInfo}>
-          <div style={styles.userName}>{user?.name || 'USER'}</div>
-          <div style={styles.userRole}>{user?.role?.toUpperCase() || 'ADMIN'}</div>
-        </div>
+      <div style={{ ...styles.user, justifyContent: collapsed ? 'center' : 'space-between' }}>
+        {!collapsed && (
+          <div style={styles.userInfo}>
+            <div style={styles.userName}>{user?.name || 'USER'}</div>
+            <div style={styles.userRole}>{user?.role?.toUpperCase() || 'ADMIN'}</div>
+          </div>
+        )}
         <button onClick={handleLogout} style={styles.logoutBtn} title="Logout">
           <LogOut size={14} />
         </button>
@@ -77,7 +112,6 @@ export default function Sidebar() {
 
 const styles: Record<string, React.CSSProperties> = {
   sidebar: {
-    width: '200px',
     minHeight: '100vh',
     background: 'var(--bg-surface)',
     borderRight: '1px solid var(--border)',
@@ -85,6 +119,23 @@ const styles: Record<string, React.CSSProperties> = {
     flexDirection: 'column',
     padding: '24px 0',
     flexShrink: 0,
+    transition: 'width 0.2s ease',
+    overflow: 'hidden',
+  },
+  toggleBtn: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    background: 'var(--bg-elevated)',
+    border: '1px solid var(--border)',
+    color: 'var(--text-muted)',
+    borderRadius: 'var(--radius)',
+    cursor: 'pointer',
+    padding: '4px',
+    margin: '0 auto 16px',
+    width: '28px',
+    height: '28px',
+    transition: 'color 0.15s',
   },
   logo: {
     display: 'flex',
@@ -92,15 +143,20 @@ const styles: Record<string, React.CSSProperties> = {
     gap: '10px',
     padding: '0 20px 20px',
   },
+  logoCollapsed: {
+    display: 'flex',
+    justifyContent: 'center',
+    padding: '0 0 20px',
+  },
   logoMark: {
     fontSize: '20px',
     color: 'var(--amber)',
   },
   logoText: {
     fontFamily: 'var(--font-display)',
-    fontSize: '18px',
+    fontSize: '12px',
     fontWeight: 800,
-    letterSpacing: '3px',
+    letterSpacing: '1px',
   },
   logoSub: {
     fontSize: '9px',
@@ -118,12 +174,18 @@ const styles: Record<string, React.CSSProperties> = {
     gap: '8px',
     padding: '0 20px 16px',
   },
+  statusCollapsed: {
+    display: 'flex',
+    justifyContent: 'center',
+    padding: '0 0 16px',
+  },
   statusDot: {
     width: '6px',
     height: '6px',
     borderRadius: '50%',
     background: 'var(--green)',
     animation: 'pulse-amber 2s infinite',
+    flexShrink: 0,
   },
   statusText: {
     fontSize: '10px',
@@ -140,7 +202,6 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     gap: '10px',
-    padding: '9px 12px',
     borderRadius: 'var(--radius)',
     color: 'var(--text-muted)',
     fontSize: '11px',
@@ -155,7 +216,6 @@ const styles: Record<string, React.CSSProperties> = {
   user: {
     display: 'flex',
     alignItems: 'center',
-    justifyContent: 'space-between',
     padding: '16px 20px 0',
   },
   userInfo: {},
@@ -179,5 +239,6 @@ const styles: Record<string, React.CSSProperties> = {
     transition: 'color 0.15s',
     display: 'flex',
     alignItems: 'center',
+    cursor: 'pointer',
   },
 };

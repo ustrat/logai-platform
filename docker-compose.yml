@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   ml-service:
     image: logai-ml-service:latest
@@ -8,6 +6,9 @@ services:
       - "8000:8000"
     environment:
       - PYTHONUNBUFFERED=1
+      - RENEWAL_DATA_PATH=/data/merged_all.csv
+    volumes:
+      - "C:/Users/Camir Inshiqaq/OneDrive/Documents/renewalguard_daily_us_separate_events/merged_all.csv:/data/merged_all.csv:ro"
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]

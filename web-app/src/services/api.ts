@@ -12,18 +12,6 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Redirect to login on 401
-api.interceptors.response.use(
-  (res) => res,
-  (err) => {
-    if (err.response?.status === 401) {
-      localStorage.removeItem('token');
-      window.location.href = '/login';
-    }
-    return Promise.reject(err);
-  }
-);
-
 export const authApi = {
   login: (email: string, password: string) =>
     api.post('/auth/login', { email, password }),
@@ -36,6 +24,17 @@ export const inferenceApi = {
   anomalies: (accountId: string) =>
     api.get(`/inference/anomalies/${accountId}`),
   train: () => api.post('/inference/train'),
+  accounts: () => api.get('/inference/accounts'),
+  summary: () => api.get('/inference/summary'),
+  reload: () => api.post('/inference/reload'),
 };
-
+export const plaidApi = {
+  linkToken: () => api.post('/plaid/link-token'),
+  exchangeToken: (public_token: string) => api.post('/plaid/exchange-token', { public_token }),
+  transactions: (count = 100) => api.get(`/plaid/transactions?count=${count}`),
+  accounts: () => api.get('/plaid/accounts'),
+  status: () => api.get('/plaid/status'),
+  sandboxConnect: () => api.post('/plaid/sandbox/connect'),
+  disconnect: () => api.delete('/plaid/disconnect'),
+};
 export default api;
