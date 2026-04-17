@@ -1,0 +1,279 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+
+Description: >
+  ValuePilot Email Intelligence Background Service.
+  Scans connected subscriber email accounts for product signals
+  across all 7 ValuePilot products on a configurable schedule.
+
+# ── Parameters ─────────────────────────────────────────────────────────────────
+Parameters:
+  Environment:
+    Type: String
+    Default: production
+    AllowedValues: [development, staging, production]
+
+  ScanIntervalHours:
+    Type: Number
+    Default: 4
+    Description: How often to run the email scan (hours)
+
+  LookbackDays:
+    Type: Number
+    Default: 90
+    Description: How many days back to scan on first run
+
+  MinConfidence:
+    Type: String
+    Default: '0.60'
+    Description: Minimum signal confidence threshold (0-1)
+
+  GoogleClientId:
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: /valuepilot/email-intel/google-client-id
+    Description: Google OAuth client ID (SSM Parameter)
+
+  GoogleClientSecret:
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: /valuepilot/email-intel/google-client-secret
+    Description: Google OAuth client secret (SSM Parameter)
+
+  MsClientId:
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: /valuepilot/email-intel/ms-client-id
+    Description: Microsoft OAuth client ID (SSM Parameter)
+
+  MsClientSecret:
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: /valuepilot/email-intel/ms-client-secret
+    Description: Microsoft OAuth client secret (SSM Parameter)
+
+  MsTenantId:
+    Type: String
+    Default: common
+    Description: Microsoft tenant ID (use 'common' for multi-tenant)
+
+  SnsTopicArn:
+    Type: String
+    Default: ''
+    Description: (Optional) SNS topic ARN to publish scan summaries
+
+# ── Globals ────────────────────────────────────────────────────────────────────
+Globals:
+  Function:
+    Runtime:      nodejs20.x
+    Architectures: [arm64]        # Graviton2 — faster + cheaper
+    MemorySize:   512
+    Timeout:      600             # 10 minutes — enough for large mailboxes
+    Environment:
+      Variables:
+        NODE_ENV:               !Ref Environment
+        S3_BUCKET:              !Ref EmailIntelBucket
+        EMAIL_LOOKBACK_DAYS:    !Ref LookbackDays
+        EMAIL_MIN_CONFIDENCE:   !Ref MinConfidence
+        GOOGLE_CLIENT_ID:       !Ref GoogleClientId
+        GOOGLE_CLIENT_SECRET:   !Ref GoogleClientSecret
+        MS_CLIENT_ID:           !Ref MsClientId
+        MS_CLIENT_SECRET:       !Ref MsClientSecret
+        MS_TENANT_ID:           !Ref MsTenantId
+        SNS_TOPIC_ARN:          !Ref SnsTopicArn
+
+# ── Resources ──────────────────────────────────────────────────────────────────
+Resources:
+
+  # ── S3 bucket (encrypted, versioned) ───────────────────────────────────────
+  EmailIntelBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub valuepilot-email-intel-${Environment}
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      VersioningConfiguration:
+        Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+          # Expire historical insight runs after 90 days
+          - Id:     ExpireOldInsights
+            Status: Enabled
+            Filter:
+              Prefix: insights/
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 90
+          # Keep connection files longer
+          - Id:     ExpireOldConnections
+            Status: Enabled
+            Filter:
+              Prefix: connections/
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 365
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls:       true
+        BlockPublicPolicy:     true
+        IgnorePublicAcls:      true
+        RestrictPublicBuckets: true
+
+  # ── Lambda function ─────────────────────────────────────────────────────────
+  EmailIntelScanFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:  !Sub valuepilot-email-intel-scan-${Environment}
+      Description:   Scans subscriber emails for ValuePilot product signals
+      CodeUri:       dist/
+      Handler:       handler.handler
+      Role:          !GetAtt EmailIntelExecutionRole.Arn
+
+      # EventBridge schedule (e.g. every 4 hours)
+      Events:
+        ScheduledScan:
+          Type: ScheduleV2
+          Properties:
+            Name:               !Sub valuepilot-email-intel-schedule-${Environment}
+            Description:        Run email intelligence scan
+            ScheduleExpression: !Sub rate(${ScanIntervalHours} hours)
+            RetryPolicy:
+              MaximumRetryAttempts: 2
+              MaximumEventAgeInSeconds: 3600
+
+      # Dead letter queue for failed invocations
+      DeadLetterQueue:
+        Type: SQS
+        TargetArn: !GetAtt EmailIntelDLQ.Arn
+
+      # Reserved concurrency: only 1 concurrent execution (scan is sequential by design)
+      ReservedConcurrentExecutions: 1
+
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify:     true
+        Target:     es2020
+        Sourcemap:  false
+        EntryPoints:
+          - src/handler.ts
+        External:
+          - '@aws-sdk/client-s3'
+          - '@aws-sdk/client-secrets-manager'
+          - '@aws-sdk/client-sns'
+
+  # ── IAM Role ────────────────────────────────────────────────────────────────
+  EmailIntelExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub valuepilot-email-intel-role-${Environment}
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: EmailIntelPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              # S3 — read/write state bucket
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:DeleteObject
+                  - s3:ListBucket
+                Resource:
+                  - !GetAtt EmailIntelBucket.Arn
+                  - !Sub ${EmailIntelBucket.Arn}/*
+              # SNS — publish scan summaries (optional)
+              - Effect: Allow
+                Action: sns:Publish
+                Resource: !If
+                  - HasSnsTopic
+                  - !Ref SnsTopicArn
+                  - !Sub arn:aws:sns:${AWS::Region}:${AWS::AccountId}:*
+              # SSM — read OAuth credentials
+              - Effect: Allow
+                Action: ssm:GetParameter
+                Resource:
+                  - !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/valuepilot/email-intel/*
+              # SQS — send to DLQ on failure
+              - Effect: Allow
+                Action: sqs:SendMessage
+                Resource: !GetAtt EmailIntelDLQ.Arn
+              # CloudWatch — custom metrics
+              - Effect: Allow
+                Action: cloudwatch:PutMetricData
+                Resource: '*'
+
+  # ── Dead Letter Queue ───────────────────────────────────────────────────────
+  EmailIntelDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName:         !Sub valuepilot-email-intel-dlq-${Environment}
+      MessageRetentionPeriod: 1209600   # 14 days
+
+  # ── CloudWatch Log Group ────────────────────────────────────────────────────
+  EmailIntelLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName:    !Sub /aws/lambda/valuepilot-email-intel-scan-${Environment}
+      RetentionInDays: 30
+
+  # ── CloudWatch Alarms ───────────────────────────────────────────────────────
+  EmailIntelErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName:          !Sub valuepilot-email-intel-errors-${Environment}
+      AlarmDescription:   Email Intel Lambda is throwing errors
+      MetricName:         Errors
+      Namespace:          AWS/Lambda
+      Dimensions:
+        - Name:  FunctionName
+          Value: !Ref EmailIntelScanFunction
+      Statistic:          Sum
+      Period:             3600       # 1 hour
+      EvaluationPeriods:  1
+      Threshold:          3
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData:   notBreaching
+
+  EmailIntelTimeoutAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName:          !Sub valuepilot-email-intel-timeout-${Environment}
+      AlarmDescription:   Email Intel Lambda is approaching timeout
+      MetricName:         Duration
+      Namespace:          AWS/Lambda
+      Dimensions:
+        - Name:  FunctionName
+          Value: !Ref EmailIntelScanFunction
+      Statistic:          Maximum
+      Period:             3600
+      EvaluationPeriods:  1
+      Threshold:          480000     # 8 minutes (80% of 10m timeout)
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData:   notBreaching
+
+# ── Conditions ─────────────────────────────────────────────────────────────────
+Conditions:
+  HasSnsTopic: !Not [!Equals [!Ref SnsTopicArn, '']]
+
+# ── Outputs ────────────────────────────────────────────────────────────────────
+Outputs:
+  FunctionArn:
+    Description: Email Intel Lambda function ARN
+    Value:       !GetAtt EmailIntelScanFunction.Arn
+    Export:
+      Name: !Sub valuepilot-email-intel-fn-${Environment}
+
+  BucketName:
+    Description: S3 bucket storing connections and insights
+    Value:       !Ref EmailIntelBucket
+    Export:
+      Name: !Sub valuepilot-email-intel-bucket-${Environment}
+
+  DLQUrl:
+    Description: Dead letter queue URL
+    Value:       !Ref EmailIntelDLQ

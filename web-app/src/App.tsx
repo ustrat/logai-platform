@@ -9,6 +9,16 @@ import RenewalRiskQueue from './pages/RenewalRiskQueue';
 import CaseFeed from './pages/CaseFeed';
 import ProviderWatchlist from './pages/ProviderWatchlist';
 import PlaidConnect from './pages/PlaidConnect';
+import EventNormalizationReview from './pages/EventNormalizationReview';
+import RenewalEligibilityReview from './pages/RenewalEligibilityReview';
+import RenewalProbabilityWorkbench from './pages/RenewalProbabilityWorkbench';
+import StrategySelector from './pages/StrategySelector';
+import SubscriptionIntelligence from './pages/SubscriptionIntelligence';
+import PricingPage from './pages/PricingPage';
+import PartnerPortal from './pages/PartnerPortal';
+import EnterpriseSales from './pages/EnterpriseSales';
+import AIIntelligence from './pages/AIIntelligence';
+
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -33,6 +43,15 @@ export default function App() {
             <Route path="/case-feed" element={<CaseFeed />} />
             <Route path="/watchlist" element={<ProviderWatchlist />} />
             <Route path="/plaid" element={<PlaidConnect />} />
+            <Route path="/event-normalization" element={<EventNormalizationReview />} />
+            <Route path="/eligibility-review" element={<RenewalEligibilityReview />} />
+            <Route path="/probability-workbench" element={<RenewalProbabilityWorkbench />} />
+            <Route path="/strategy-selector" element={<StrategySelector />} />
+            <Route path="/subscriptions" element={<SubscriptionIntelligence />} />
+            <Route path="/pricing" element={<PricingPage />} />
+            <Route path="/partner-portal" element={<PartnerPortal />} />
+            <Route path="/enterprise" element={<EnterpriseSales />} />
+            <Route path="/ai-intelligence" element={<AIIntelligence />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

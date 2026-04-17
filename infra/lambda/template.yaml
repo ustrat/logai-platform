@@ -1,0 +1,270 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: VALUEPILOT — Lambda functions for all renewal event types
+
+Globals:
+  Function:
+    Runtime: python3.12
+    Timeout: 30
+    MemorySize: 256
+    Environment:
+      Variables:
+        ALERT_TOPIC_ARN: !Ref ExistingAlertTopicArn
+
+Parameters:
+  Environment:
+    Type: String
+    Default: prod
+    AllowedValues: [dev, staging, prod]
+  ExistingAlertTopicArn:
+    Type: String
+    Default: "arn:aws:sns:us-east-1:803283181205:valuepilot-alerts-prod"
+    Description: "Pre-created SNS topic ARN. Leave default for prod."
+
+Resources:
+
+  # ── SNS Topic for all alerts ─────────────────────────────────────────────
+  AlertTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub "valuepilot-alerts-${Environment}"
+      DisplayName: VALUEPILOT Renewal Alerts
+
+  # ── SQS Dead-letter queue ─────────────────────────────────────────────────
+  EventDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub "valuepilot-event-dlq-${Environment}"
+      MessageRetentionPeriod: 1209600  # 14 days
+
+  # ── 1. Cancellation Deadline (critical) ──────────────────────────────────
+  CancellationDeadlineFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "valuepilot-cancellation-deadline-${Environment}"
+      CodeUri: handlers/
+      Handler: cancellation_deadline.handler
+      Description: "Fires when a subscription cancellation deadline is within 3 days"
+      DeadLetterQueue:
+        Type: SQS
+        TargetArn: !GetAtt EventDLQ.Arn
+      Policies:
+        - SNSPublishMessagePolicy:
+            TopicName: !GetAtt AlertTopic.TopicName
+      Events:
+        EventBridgeRule:
+          Type: EventBridgeRule
+          Properties:
+            Pattern:
+              source: ["valuepilot.renewals"]
+              detail-type: ["cancellation_deadline"]
+        ApiEvent:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ValuepilotApi
+            Path: /events/cancellation-deadline
+            Method: POST
+
+  # ── 2. High Risk Accounts (high) ─────────────────────────────────────────
+  HighRiskAccountsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "valuepilot-high-risk-accounts-${Environment}"
+      CodeUri: handlers/
+      Handler: high_risk_accounts.handler
+      Description: "Fires when an account risk score exceeds 75%"
+      DeadLetterQueue:
+        Type: SQS
+        TargetArn: !GetAtt EventDLQ.Arn
+      Environment:
+        Variables:
+          ALERT_TOPIC_ARN: !Ref AlertTopic
+          RISK_THRESHOLD: "0.75"
+      Policies:
+        - SNSPublishMessagePolicy:
+            TopicName: !GetAtt AlertTopic.TopicName
+      Events:
+        EventBridgeRule:
+          Type: EventBridgeRule
+          Properties:
+            Pattern:
+              source: ["valuepilot.renewals"]
+              detail-type: ["high_risk_accounts"]
+        ApiEvent:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ValuepilotApi
+            Path: /events/high-risk-accounts
+            Method: POST
+
+  # ── 3. Price Shock (high) ────────────────────────────────────────────────
+  PriceShockFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "valuepilot-price-shock-${Environment}"
+      CodeUri: handlers/
+      Handler: price_shock.handler
+      Description: "Fires when a subscription price delta exceeds $500"
+      DeadLetterQueue:
+        Type: SQS
+        TargetArn: !GetAtt EventDLQ.Arn
+      Environment:
+        Variables:
+          ALERT_TOPIC_ARN: !Ref AlertTopic
+          PRICE_DELTA_THRESHOLD: "500"
+      Policies:
+        - SNSPublishMessagePolicy:
+            TopicName: !GetAtt AlertTopic.TopicName
+      Events:
+        EventBridgeRule:
+          Type: EventBridgeRule
+          Properties:
+            Pattern:
+              source: ["valuepilot.renewals"]
+              detail-type: ["price_shock"]
+        ApiEvent:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ValuepilotApi
+            Path: /events/price-shock
+            Method: POST
+
+  # ── 4. Usage Decline (medium) ────────────────────────────────────────────
+  UsageDeclineFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "valuepilot-usage-decline-${Environment}"
+      CodeUri: handlers/
+      Handler: usage_decline.handler
+      Description: "Fires when a subscription shows >50% usage decline"
+      DeadLetterQueue:
+        Type: SQS
+        TargetArn: !GetAtt EventDLQ.Arn
+      Environment:
+        Variables:
+          ALERT_TOPIC_ARN: !Ref AlertTopic
+          USAGE_DROP_THRESHOLD: "-50"
+      Policies:
+        - SNSPublishMessagePolicy:
+            TopicName: !GetAtt AlertTopic.TopicName
+      Events:
+        EventBridgeRule:
+          Type: EventBridgeRule
+          Properties:
+            Pattern:
+              source: ["valuepilot.renewals"]
+              detail-type: ["usage_decline"]
+        ApiEvent:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ValuepilotApi
+            Path: /events/usage-decline
+            Method: POST
+
+  # ── 5. Pending Approvals (medium) ────────────────────────────────────────
+  PendingApprovalsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "valuepilot-pending-approvals-${Environment}"
+      CodeUri: handlers/
+      Handler: pending_approvals.handler
+      Description: "Fires when cases are awaiting approval"
+      DeadLetterQueue:
+        Type: SQS
+        TargetArn: !GetAtt EventDLQ.Arn
+      Policies:
+        - SNSPublishMessagePolicy:
+            TopicName: !GetAtt AlertTopic.TopicName
+      Events:
+        EventBridgeRule:
+          Type: EventBridgeRule
+          Properties:
+            Pattern:
+              source: ["valuepilot.renewals"]
+              detail-type: ["pending_approvals"]
+        ApiEvent:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ValuepilotApi
+            Path: /events/pending-approvals
+            Method: POST
+
+  # ── 6. Incomplete Evidence (medium) ──────────────────────────────────────
+  IncompleteEvidenceFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "valuepilot-incomplete-evidence-${Environment}"
+      CodeUri: handlers/
+      Handler: incomplete_evidence.handler
+      Description: "Fires when a case has missing evidence submissions"
+      DeadLetterQueue:
+        Type: SQS
+        TargetArn: !GetAtt EventDLQ.Arn
+      Policies:
+        - SNSPublishMessagePolicy:
+            TopicName: !GetAtt AlertTopic.TopicName
+      Events:
+        EventBridgeRule:
+          Type: EventBridgeRule
+          Properties:
+            Pattern:
+              source: ["valuepilot.renewals"]
+              detail-type: ["incomplete_evidence"]
+        ApiEvent:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ValuepilotApi
+            Path: /events/incomplete-evidence
+            Method: POST
+
+  # ── 7. Auto-Renew Disabled (low) ─────────────────────────────────────────
+  AutoRenewDisabledFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "valuepilot-auto-renew-disabled-${Environment}"
+      CodeUri: handlers/
+      Handler: auto_renew_disabled.handler
+      Description: "Fires when a subscription has auto-renew turned off"
+      DeadLetterQueue:
+        Type: SQS
+        TargetArn: !GetAtt EventDLQ.Arn
+      Policies:
+        - SNSPublishMessagePolicy:
+            TopicName: !GetAtt AlertTopic.TopicName
+      Events:
+        EventBridgeRule:
+          Type: EventBridgeRule
+          Properties:
+            Pattern:
+              source: ["valuepilot.renewals"]
+              detail-type: ["auto_renew_disabled"]
+        ApiEvent:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ValuepilotApi
+            Path: /events/auto-renew-disabled
+            Method: POST
+
+  # ── API Gateway ───────────────────────────────────────────────────────────
+  ValuepilotApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name: !Sub "valuepilot-events-api-${Environment}"
+      StageName: !Ref Environment
+      Auth:
+        DefaultAuthorizer: AWS_IAM
+
+Outputs:
+  AlertTopicArn:
+    Description: SNS topic ARN for all VALUEPILOT alerts
+    Value: !Ref AlertTopic
+    Export:
+      Name: !Sub "valuepilot-alert-topic-${Environment}"
+
+  EventDLQUrl:
+    Description: Dead-letter queue URL for failed events
+    Value: !Ref EventDLQ
+
+  ApiEndpoint:
+    Description: API Gateway endpoint for posting events
+    Value: !Sub "https://${ValuepilotApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}"

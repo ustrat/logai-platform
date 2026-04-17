@@ -1,19 +1,32 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
-import { LayoutDashboard, AlertTriangle, TrendingUp, Settings, LogOut, Activity, ChevronLeft, ChevronRight, RefreshCw, CreditCard } from 'lucide-react';
-import { List, Briefcase, Eye } from 'lucide-react';
+import {
+  LayoutDashboard, AlertTriangle, TrendingUp, Settings, LogOut,
+  Activity, ChevronLeft, ChevronRight, RefreshCw, CreditCard,
+  List, Briefcase, Eye, FileSearch, ClipboardCheck, BarChart2,
+  Target, Repeat, Sparkles, Building2, DollarSign, Mail, Brain,
+} from 'lucide-react';
 
 const navItems = [
-  { to: '/', icon: LayoutDashboard, label: 'DASHBOARD' },
-  { to: '/anomalies', icon: AlertTriangle, label: 'ANOMALIES' },
-  { to: '/patterns', icon: TrendingUp, label: 'PATTERNS' },
-  { to: '/monitor', icon: Activity, label: 'MONITOR' },
-  { to: '/settings', icon: Settings, label: 'SETTINGS' },
-  { to: '/renewals', icon: RefreshCw, label: 'RENEWALS' },
-  { to: '/risk-queue', icon: List,      label: 'RISK QUEUE' },
-  { to: '/case-feed',  icon: Briefcase, label: 'CASE FEED' },
-  { to: '/watchlist',  icon: Eye,       label: 'WATCHLIST' },
-  { to: '/plaid',  icon: CreditCard,       label: 'PLAID' },
+  // { to: '/',                      icon: LayoutDashboard, label: 'DASHBOARD' },
+  // { to: '/anomalies',             icon: AlertTriangle,   label: 'ANOMALIES' },
+  // { to: '/patterns',              icon: TrendingUp,      label: 'PATTERNS' },
+  // { to: '/monitor',               icon: Activity,        label: 'MONITOR' },
+  { to: '/renewals',              icon: RefreshCw,       label: 'RENEWALS' },
+  { to: '/risk-queue',            icon: List,            label: 'RISK QUEUE' },
+  { to: '/case-feed',             icon: Briefcase,       label: 'CASE FEED' },
+  { to: '/watchlist',             icon: Eye,             label: 'WATCHLIST' },
+  { to: '/event-normalization',   icon: FileSearch,      label: 'NORMALIZATION' },
+  { to: '/eligibility-review',    icon: ClipboardCheck,  label: 'ELIGIBILITY' },
+  { to: '/probability-workbench', icon: BarChart2,       label: 'PROBABILITY' },
+  { to: '/strategy-selector',     icon: Target,          label: 'STRATEGY' },
+  { to: '/subscriptions',         icon: Repeat,          label: 'SUBSCRIPTIONS' },
+  { to: '/plaid',                 icon: CreditCard,      label: 'PLAID' },
+  { to: '/ai-intelligence',         icon: Brain,           label: 'AI INTEL' },
+  { to: '/enterprise',             icon: DollarSign,      label: 'ENTERPRISE' },
+  { to: '/partner-portal',         icon: Building2,       label: 'PARTNER' },
+  { to: '/pricing',               icon: Sparkles,        label: 'UPGRADE' },
+  { to: '/settings',              icon: Settings,        label: 'SETTINGS' },
 ];
 
 interface SidebarProps {
@@ -25,220 +38,78 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
+  const handleLogout = () => { logout(); navigate('/login'); };
 
   return (
-    <aside style={{ ...styles.sidebar, width: collapsed ? '60px' : '200px' }}>
-      {/* Toggle button */}
-      <button onClick={onToggle} style={styles.toggleBtn} title={collapsed ? 'Expand' : 'Collapse'}>
-        {collapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
-      </button>
-
-      {/* Logo */}
-      {!collapsed && (
-        <div style={styles.logo}>
-          <span style={styles.logoMark}>⬡</span>
+    <aside style={{
+      width: collapsed ? '56px' : '200px',
+      minHeight: '100vh',
+      background: 'var(--bg-sidebar)',
+      borderRight: '1px solid rgba(255,255,255,0.08)',
+      display: 'flex', flexDirection: 'column', flexShrink: 0,
+      transition: 'width 0.2s ease', overflow: 'hidden',
+    }}>
+      <div style={{ padding: '14px 12px 8px', display: 'flex', justifyContent: collapsed ? 'center' : 'flex-end' }}>
+        <button onClick={onToggle} style={{ width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', color: 'var(--text-sidebar)', borderRadius: 'var(--radius)', cursor: 'pointer', flexShrink: 0 }}>
+          {collapsed ? <ChevronRight size={13} /> : <ChevronLeft size={13} />}
+        </button>
+      </div>
+      {!collapsed ? (
+        <div style={{ padding: '0 16px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ fontSize: 20, color: '#f59e0b' }}>⬡</span>
           <div>
-            <div style={styles.logoText}>VALUEPOINT</div>
-            <div style={styles.logoSub}>v1.0.0</div>
+            <div style={{ fontSize: 13, fontWeight: 800, color: '#ffffff', letterSpacing: '1px' }}>VALUEPILOT</div>
+            <div style={{ fontSize: 9, color: 'var(--text-sidebar-muted)', letterSpacing: '2px' }}>v1.0.0</div>
           </div>
         </div>
-      )}
-      {collapsed && (
-        <div style={styles.logoCollapsed}>
-          <span style={styles.logoMark}>⬡</span>
+      ) : (
+        <div style={{ padding: '0 0 16px', display: 'flex', justifyContent: 'center' }}>
+          <span style={{ fontSize: 20, color: '#f59e0b' }}>⬡</span>
         </div>
       )}
-
-      <div style={styles.divider} />
-
-      {/* Status indicator */}
-      {!collapsed && (
-        <div style={styles.status}>
-          <div style={styles.statusDot} />
-          <span style={styles.statusText}>SYSTEM ONLINE</span>
+      <div style={{ height: 1, background: 'rgba(255,255,255,0.08)', margin: '0 12px 10px' }} />
+      {!collapsed ? (
+        <div style={{ padding: '0 16px 10px', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#22c55e', flexShrink: 0 }} />
+          <span style={{ fontSize: 10, letterSpacing: '1.5px', color: '#22c55e' }}>SYSTEM ONLINE</span>
+        </div>
+      ) : (
+        <div style={{ padding: '0 0 10px', display: 'flex', justifyContent: 'center' }}>
+          <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#22c55e' }} />
         </div>
       )}
-      {collapsed && (
-        <div style={styles.statusCollapsed}>
-          <div style={styles.statusDot} />
-        </div>
-      )}
-
-      <div style={styles.divider} />
-
-      {/* Nav */}
-      <nav style={styles.nav}>
+      <div style={{ height: 1, background: 'rgba(255,255,255,0.08)', margin: '0 12px 8px' }} />
+      <nav style={{ flex: 1, overflowY: 'auto', padding: '4px 8px', display: 'flex', flexDirection: 'column', gap: 2 }}>
         {navItems.map(({ to, icon: Icon, label }) => (
-          <NavLink
-            key={to}
-            to={to}
-            end={to === '/'}
+          <NavLink key={to} to={to} end={to === '/'} title={collapsed ? label : undefined}
             style={({ isActive }) => ({
-              ...styles.navItem,
-              ...(isActive ? styles.navItemActive : {}),
+              display: 'flex', alignItems: 'center', gap: collapsed ? 0 : 9,
               justifyContent: collapsed ? 'center' : 'flex-start',
-              padding: collapsed ? '9px' : '9px 12px',
-            })}
-            title={collapsed ? label : undefined}
-          >
-            <Icon size={14} />
+              padding: collapsed ? '8px' : '7px 10px',
+              borderRadius: 'var(--radius)',
+              color: isActive ? '#ffffff' : 'var(--text-sidebar)',
+              background: isActive ? 'var(--bg-sidebar-active)' : 'transparent',
+              fontSize: '10px', letterSpacing: '1px', fontWeight: isActive ? 700 : 400,
+              textDecoration: 'none', transition: 'all 0.15s',
+              borderLeft: isActive ? '2px solid #f59e0b' : '2px solid transparent',
+            })}>
+            <Icon size={14} style={{ flexShrink: 0 }} />
             {!collapsed && <span>{label}</span>}
           </NavLink>
         ))}
       </nav>
-
-      <div style={{ flex: 1 }} />
-
-      {/* User */}
-      <div style={styles.divider} />
-      <div style={{ ...styles.user, justifyContent: collapsed ? 'center' : 'space-between' }}>
+      <div style={{ height: 1, background: 'rgba(255,255,255,0.08)', margin: '8px 12px' }} />
+      <div style={{ padding: collapsed ? '12px 0' : '12px 16px', display: 'flex', alignItems: 'center', justifyContent: collapsed ? 'center' : 'space-between', gap: 8 }}>
         {!collapsed && (
-          <div style={styles.userInfo}>
-            <div style={styles.userName}>{user?.name || 'USER'}</div>
-            <div style={styles.userRole}>{user?.role?.toUpperCase() || 'ADMIN'}</div>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', letterSpacing: '0.5px' }}>{user?.name || 'USER'}</div>
+            <div style={{ fontSize: 9, color: '#f59e0b', letterSpacing: '1.5px', marginTop: 1 }}>{user?.role?.toUpperCase() || 'ADMIN'}</div>
           </div>
         )}
-        <button onClick={handleLogout} style={styles.logoutBtn} title="Logout">
-          <LogOut size={14} />
+        <button onClick={handleLogout} title="Logout" style={{ background: 'rgba(255,255,255,0.08)', color: 'var(--text-sidebar)', padding: '5px', borderRadius: 'var(--radius)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', border: '1px solid rgba(255,255,255,0.08)' }}>
+          <LogOut size={13} />
         </button>
       </div>
     </aside>
   );
 }
-
-const styles: Record<string, React.CSSProperties> = {
-  sidebar: {
-    minHeight: '100vh',
-    background: 'var(--bg-surface)',
-    borderRight: '1px solid var(--border)',
-    display: 'flex',
-    flexDirection: 'column',
-    padding: '24px 0',
-    flexShrink: 0,
-    transition: 'width 0.2s ease',
-    overflow: 'hidden',
-  },
-  toggleBtn: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    background: 'var(--bg-elevated)',
-    border: '1px solid var(--border)',
-    color: 'var(--text-muted)',
-    borderRadius: 'var(--radius)',
-    cursor: 'pointer',
-    padding: '4px',
-    margin: '0 auto 16px',
-    width: '28px',
-    height: '28px',
-    transition: 'color 0.15s',
-  },
-  logo: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '10px',
-    padding: '0 20px 20px',
-  },
-  logoCollapsed: {
-    display: 'flex',
-    justifyContent: 'center',
-    padding: '0 0 20px',
-  },
-  logoMark: {
-    fontSize: '20px',
-    color: 'var(--amber)',
-  },
-  logoText: {
-    fontFamily: 'var(--font-display)',
-    fontSize: '12px',
-    fontWeight: 800,
-    letterSpacing: '1px',
-  },
-  logoSub: {
-    fontSize: '9px',
-    color: 'var(--text-muted)',
-    letterSpacing: '2px',
-  },
-  divider: {
-    height: '1px',
-    background: 'var(--border)',
-    margin: '0 20px 16px',
-  },
-  status: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    padding: '0 20px 16px',
-  },
-  statusCollapsed: {
-    display: 'flex',
-    justifyContent: 'center',
-    padding: '0 0 16px',
-  },
-  statusDot: {
-    width: '6px',
-    height: '6px',
-    borderRadius: '50%',
-    background: 'var(--green)',
-    animation: 'pulse-amber 2s infinite',
-    flexShrink: 0,
-  },
-  statusText: {
-    fontSize: '10px',
-    letterSpacing: '2px',
-    color: 'var(--green)',
-  },
-  nav: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '2px',
-    padding: '0 12px',
-  },
-  navItem: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '10px',
-    borderRadius: 'var(--radius)',
-    color: 'var(--text-muted)',
-    fontSize: '11px',
-    letterSpacing: '1.5px',
-    transition: 'all 0.15s',
-    textDecoration: 'none',
-  },
-  navItemActive: {
-    color: 'var(--amber)',
-    background: 'var(--amber-glow)',
-  },
-  user: {
-    display: 'flex',
-    alignItems: 'center',
-    padding: '16px 20px 0',
-  },
-  userInfo: {},
-  userName: {
-    fontSize: '11px',
-    fontWeight: 700,
-    color: 'var(--text-primary)',
-    letterSpacing: '1px',
-  },
-  userRole: {
-    fontSize: '9px',
-    color: 'var(--amber)',
-    letterSpacing: '2px',
-    marginTop: '2px',
-  },
-  logoutBtn: {
-    background: 'none',
-    color: 'var(--text-muted)',
-    padding: '4px',
-    borderRadius: 'var(--radius)',
-    transition: 'color 0.15s',
-    display: 'flex',
-    alignItems: 'center',
-    cursor: 'pointer',
-  },
-};

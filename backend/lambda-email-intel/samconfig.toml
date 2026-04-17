@@ -1,0 +1,27 @@
+[default.global.parameters]
+stack_name      = "valuepilot-email-intel"
+region          = "us-east-1"
+confirm_changeset = true
+capabilities    = "CAPABILITY_IAM CAPABILITY_NAMED_IAM"
+disable_rollback = false
+
+[default.build.parameters]
+cached = true
+parallel = true
+
+[default.deploy.parameters]
+stack_name         = "valuepilot-email-intel"
+s3_bucket          = "valuepilot-sam-artifacts"   # replace with your SAM artifacts bucket
+s3_prefix          = "email-intel"
+region             = "us-east-1"
+capabilities       = "CAPABILITY_IAM CAPABILITY_NAMED_IAM"
+parameter_overrides = [
+  "Environment=production",
+  "ScanIntervalHours=4",
+  "LookbackDays=90",
+  "MinConfidence=0.60",
+  "MsTenantId=common"
+]
+
+[default.local_invoke.parameters]
+env_vars = "env.json"
