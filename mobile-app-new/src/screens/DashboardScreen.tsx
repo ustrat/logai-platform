@@ -4,20 +4,43 @@ import {
   StyleSheet, ActivityIndicator, RefreshControl, Platform,
 } from 'react-native';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { inferenceApi } from '../services/api';
+import { inferenceApi, plaidApi } from '../services/api';
 import { Colors, SEVERITY_COLORS } from '../theme';
-
-const ACCOUNTS = ['ACC-0001', 'ACC-0002', 'ACC-0003', 'ACC-0004', 'ACC-0005'];
+import { router } from 'expo-router';
 
 export default function DashboardScreen() {
-  const [accountId, setAccountId] = useState('ACC-0001');
+  const [accountId, setAccountId] = useState('');
+
+  // Load real account IDs from ML service
+  const { data: accountsData } = useQuery({
+    queryKey: ['accounts'],
+    queryFn: async () => {
+      const res = await inferenceApi.accounts();
+      return (res.data as any).accounts as string[];
+    },
+    staleTime: 60_000,
+  });
+
+  const accounts = accountsData?.slice(0, 8) || [];
+  const currentAccountId = accountId || accounts[0] || '';
+
+  // Plaid connection status
+  const { data: plaidStatus } = useQuery({
+    queryKey: ['plaid-status'],
+    queryFn: async () => {
+      const res = await plaidApi.status();
+      return res.data.data as { connected: boolean; institution?: string; accountCount?: number };
+    },
+    staleTime: 30_000,
+  });
 
   const { data, isLoading, isError, refetch, isFetching } = useQuery({
-    queryKey: ['analyze', accountId],
+    queryKey: ['analyze', currentAccountId],
     queryFn: async () => {
-      const res = await inferenceApi.analyze({ account_id: accountId, limit: 200 });
+      const res = await inferenceApi.analyze({ account_id: currentAccountId, limit: 200 });
       return res.data.data;
     },
+    enabled: !!currentAccountId,
   });
 
   const trainMutation = useMutation({ mutationFn: () => inferenceApi.train() });
@@ -38,15 +61,32 @@ export default function DashboardScreen() {
         <Text style={styles.headerTitle}>Dashboard</Text>
       </View>
 
+      {/* Plaid connection banner */}
+      {plaidStatus && (
+        <TouchableOpacity
+          style={[styles.plaidBanner, { borderColor: plaidStatus.connected ? Colors.green : Colors.amber }]}
+          onPress={() => router.push('/(tabs)/connect' as any)}
+          activeOpacity={0.8}
+        >
+          <View style={[styles.plaidDot, { backgroundColor: plaidStatus.connected ? Colors.green : Colors.textMuted }]} />
+          <Text style={[styles.plaidBannerText, { color: plaidStatus.connected ? Colors.green : Colors.textMuted }]}>
+            {plaidStatus.connected
+              ? `PLAID · ${plaidStatus.institution || 'CONNECTED'} · ${plaidStatus.accountCount || 0} accounts`
+              : 'PLAID · NOT CONNECTED — Tap to link bank'}
+          </Text>
+          <Text style={styles.plaidArrow}>→</Text>
+        </TouchableOpacity>
+      )}
+
       {/* Account selector */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.accountScroll}>
-        {ACCOUNTS.map(acc => (
+        {accounts.map(acc => (
           <TouchableOpacity
             key={acc}
-            style={[styles.accountChip, accountId === acc && styles.accountChipActive]}
+            style={[styles.accountChip, currentAccountId === acc && styles.accountChipActive]}
             onPress={() => setAccountId(acc)}
           >
-            <Text style={[styles.accountChipText, accountId === acc && styles.accountChipTextActive]}>
+            <Text style={[styles.accountChipText, currentAccountId === acc && styles.accountChipTextActive]}>
               {acc}
             </Text>
           </TouchableOpacity>
@@ -196,6 +236,10 @@ const styles = StyleSheet.create({
   header: { marginBottom: 16 },
   headerLabel: { fontSize: 10, letterSpacing: 3, color: Colors.amber, marginBottom: 4 },
   headerTitle: { fontSize: 22, fontWeight: '700', color: Colors.textPrimary, fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace' },
+  plaidBanner: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.bgSurface, borderWidth: 1, borderRadius: 4, paddingHorizontal: 12, paddingVertical: 10, marginBottom: 12, gap: 8 },
+  plaidDot: { width: 7, height: 7, borderRadius: 4 },
+  plaidBannerText: { fontSize: 10, letterSpacing: 1, flex: 1 },
+  plaidArrow: { color: Colors.textMuted, fontSize: 12 },
   accountScroll: { marginBottom: 12 },
   accountChip: { borderWidth: 1, borderColor: Colors.border, borderRadius: 4, paddingHorizontal: 12, paddingVertical: 6, marginRight: 8, backgroundColor: Colors.bgSurface },
   accountChipActive: { borderColor: Colors.amber, backgroundColor: Colors.amberDim },

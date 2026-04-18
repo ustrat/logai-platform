@@ -20,7 +20,7 @@ export const plaidService = {
     const res = await plaidClient.post('/link/token/create', {
       ...basePayload(),
       user: { client_user_id: userId },
-      client_name: 'ValuePoint',
+      client_name: 'ValuePilot',
       products: ['transactions'],
       country_codes: ['US'],
       language: 'en',

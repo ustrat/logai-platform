@@ -10,14 +10,12 @@ from ..services.csv_data_service import (
     get_summary_stats,
     reload_csv,
 )
-from ..models.anomaly_detector import AnomalyDetector
+from ..models.anomaly_detector import anomaly_detector
 from ..models.pattern_recognizer import PatternRecognizer
 from ..models.recommendation_engine import RecommendationEngine
 
 router = APIRouter()
 
-# Shared model instances
-anomaly_detector = AnomalyDetector()
 pattern_recognizer = PatternRecognizer()
 recommendation_engine = RecommendationEngine()
 
@@ -31,76 +29,90 @@ class TrainRequest(BaseModel):
     limit: Optional[int] = 10000
 
 
-@router.post("/train")
-def train_model(req: TrainRequest):
+def _is_model_trained() -> bool:
+    """Check if the anomaly detector has been trained."""
     try:
-        X = get_feature_matrix(limit=req.limit)
-        if len(X) == 0:
-            raise ValueError("No data available for training")
-        anomaly_detector.fit(X)
+        anomaly_detector.model.predict([[0] * 12])
+        return True
+    except Exception:
+        return False
+
+
+@router.post("/train")
+def train_model(req: TrainRequest = TrainRequest()):
+    try:
+        transactions = get_transactions(limit=req.limit or 10000)
+        if not transactions:
+            raise ValueError("No training data available in CSV")
+
+        result = anomaly_detector.train(transactions)
         return {
-            "status": "trained",
-            "samples": len(X),
-            "model_version": "2.0.0-csv",
+            "status": result.get("status", "trained"),
+            "samples": result.get("samples", len(transactions)),
+            "model_version": result.get("model_version", "2.0.0-csv"),
         }
     except Exception as e:
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/analyze")
-def analyze_transactions(req: AnalyzeRequest):
+def analyze_transactions(req: AnalyzeRequest = AnalyzeRequest()):
     try:
-        if not anomaly_detector.is_fitted:
-            # Auto-train on first use
-            X = get_feature_matrix(limit=10000)
-            anomaly_detector.fit(X)
-
+        # Fetch transactions from CSV
         transactions = get_transactions(
-            account_id=req.account_id,
+            account_id=req.account_id if req.account_id and req.account_id != "ALL" else None,
             limit=req.limit or 500,
         )
 
         if not transactions:
-            raise HTTPException(status_code=404, detail="No transactions found for this account")
+            raise HTTPException(status_code=404, detail="No transactions found")
 
-        # Build feature matrix for these transactions
-        import numpy as np
-        feature_keys = [
-            "amount", "expected_amount", "current_plan", "price_delta",
-            "usage_change_pct", "risk_score", "confidence_score",
-            "days_to_renewal", "days_to_cancellation",
-            "evidence_required", "evidence_received", "escalation_level",
-        ]
-        X = np.array([[t.get(k, 0) for k in feature_keys] for t in transactions], dtype=np.float32)
+        # Auto-train if model not fitted
+        if not _is_model_trained():
+            all_transactions = get_transactions(limit=10000)
+            anomaly_detector.train(all_transactions)
 
-        # Anomaly detection
-        anomaly_results = anomaly_detector.predict_with_scores(X)
+        # Run anomaly detection using existing predict method
+        anomaly_results = anomaly_detector.predict(transactions)
 
-        # Enrich transactions with anomaly info
+        # Build result map by transaction_id
+        result_map = {r.transaction_id: r for r in anomaly_results}
+
+        # Enrich transactions with anomaly data
         enriched = []
-        for i, txn in enumerate(transactions):
-            score = float(anomaly_results["scores"][i])
-            is_anomaly = bool(anomaly_results["labels"][i])
+        for txn in transactions:
+            txn_id = str(txn.get("transaction_id", ""))
+            result = result_map.get(txn_id)
 
-            reasons = []
-            if txn["risk_score"] > 0.75:
+            if result:
+                score = result.anomaly_score
+                is_anomaly = result.is_anomaly
+                reasons = list(result.reasons)
+            else:
+                score = 0.0
+                is_anomaly = False
+                reasons = []
+
+            # Add domain-specific reasons from CSV fields
+            if txn.get("risk_score", 0) > 0.75:
                 reasons.append(f"High risk score: {txn['risk_score']:.0%}")
-            if txn["price_delta"] > 500:
-                reasons.append(f"Large price delta: ${txn['price_delta']:,.0f}")
-            if txn["usage_change_pct"] < -50:
+            if abs(txn.get("price_delta", 0)) > 500:
+                reasons.append(f"Large price delta: ${abs(txn['price_delta']):,.0f}")
+            if txn.get("usage_change_pct", 0) < -50:
                 reasons.append(f"Significant usage drop: {txn['usage_change_pct']}%")
-            if txn["days_to_renewal"] <= 7:
+            if txn.get("days_to_renewal", 99) <= 7:
                 reasons.append(f"Renewal imminent: {txn['days_to_renewal']} days")
-            if txn["days_to_cancellation"] <= 3:
+            if txn.get("days_to_cancellation", 99) <= 3:
                 reasons.append(f"Cancellation deadline critical: {txn['days_to_cancellation']} days")
-            if txn["escalation_level"] >= 3:
+            if txn.get("escalation_level", 0) >= 3:
                 reasons.append(f"High escalation level: {txn['escalation_level']}")
 
             enriched.append({
                 **txn,
                 "anomaly_score": score,
                 "is_anomaly": is_anomaly,
-                "reasons": reasons,
+                "reasons": list(set(reasons)),
             })
 
         # Pattern recognition
@@ -126,14 +138,19 @@ def analyze_transactions(req: AnalyzeRequest):
 
 @router.get("/anomalies/{account_id}")
 def get_account_anomalies(account_id: str):
-    req = AnalyzeRequest(account_id=account_id, limit=200)
-    result = analyze_transactions(req)
-    flagged = [t for t in result["anomalies"] if t["is_anomaly"]]
-    return {
-        "account_id": account_id,
-        "flagged_count": len(flagged),
-        "anomalies": flagged,
-    }
+    try:
+        req = AnalyzeRequest(account_id=account_id, limit=200)
+        result = analyze_transactions(req)
+        flagged = [t for t in result["anomalies"] if t["is_anomaly"]]
+        return {
+            "account_id": account_id,
+            "flagged_count": len(flagged),
+            "anomalies": flagged,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/accounts")
@@ -155,9 +172,8 @@ def data_summary():
 
 @router.post("/reload")
 def reload_data():
-    """Force reload CSV from disk."""
     try:
-        df_info = reload_csv()
+        reload_csv()
         return {"status": "reloaded", "message": "CSV data reloaded successfully"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

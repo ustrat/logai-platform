@@ -1,0 +1,105 @@
+{
+  "orgs": {
+    "org_508c1e5b-d6dc-4b4e-9f96-1113dc5c01b9": {
+      "orgId": "org_508c1e5b-d6dc-4b4e-9f96-1113dc5c01b9",
+      "orgName": "logai.dev",
+      "orgType": "federal",
+      "domain": "logai.dev",
+      "licensePools": {
+        "renewalguard": {
+          "total": 25,
+          "reserved": 0
+        },
+        "refundpilot": {
+          "total": 25,
+          "reserved": 0
+        }
+      },
+      "ssoEnabled": false,
+      "createdAt": "2026-04-15T02:31:23.258Z",
+      "updatedAt": "2026-04-15T02:32:36.919Z",
+      "ssoProvider": "",
+      "agencyName": "",
+      "fismaLevel": "",
+      "contractNumber": "",
+      "cotrEmail": "",
+      "accountManager": ""
+    },
+    "org_ac32e996-adbc-4144-8c22-7fb1693686a0": {
+      "orgId": "org_ac32e996-adbc-4144-8c22-7fb1693686a0",
+      "orgName": "logai.dev",
+      "orgType": "commercial",
+      "domain": "logai.dev",
+      "licensePools": {
+        "renewalguard": {
+          "total": 25,
+          "reserved": 0
+        },
+        "refundpilot": {
+          "total": 25,
+          "reserved": 0
+        }
+      },
+      "ssoEnabled": false,
+      "createdAt": "2026-04-15T04:35:34.637Z",
+      "updatedAt": "2026-04-15T04:35:34.637Z"
+    }
+  },
+  "members": [
+    {
+      "id": "dd2b0b09-503b-4be4-840a-5b0646c031ea",
+      "orgId": "org_508c1e5b-d6dc-4b4e-9f96-1113dc5c01b9",
+      "email": "xx",
+      "name": "William Payne",
+      "department": "IT",
+      "jobTitle": "Leader",
+      "role": "user",
+      "productKeys": [
+        "renewalguard",
+        "refundpilot"
+      ],
+      "status": "suspended",
+      "accessLevel": "standard",
+      "agencyCode": "",
+      "cacEnabled": false,
+      "clearanceLevel": "None",
+      "costCenter": "",
+      "notes": "",
+      "assignedBy": "508c1e5b-d6dc-4b4e-9f96-1113dc5c01b9",
+      "assignedAt": "2026-04-15T02:35:03.516Z"
+    }
+  ],
+  "audit": [
+    {
+      "id": "ae1cd5bc-6217-4c60-8ca1-f8221d1e0039",
+      "timestamp": "2026-04-15T02:35:25.956Z",
+      "orgId": "org_508c1e5b-d6dc-4b4e-9f96-1113dc5c01b9",
+      "action": "suspend",
+      "actorId": "508c1e5b-d6dc-4b4e-9f96-1113dc5c01b9",
+      "actorEmail": "admin@logai.dev",
+      "targetEmail": "xx",
+      "targetName": "William Payne",
+      "detail": "Member suspendd"
+    },
+    {
+      "id": "803a4b2b-6513-4d5a-ae7c-b10abb65faf1",
+      "timestamp": "2026-04-15T02:35:03.516Z",
+      "orgId": "org_508c1e5b-d6dc-4b4e-9f96-1113dc5c01b9",
+      "action": "assign",
+      "actorId": "508c1e5b-d6dc-4b4e-9f96-1113dc5c01b9",
+      "actorEmail": "admin@logai.dev",
+      "targetEmail": "xx",
+      "targetName": "William Payne",
+      "detail": "Licence assigned for renewalguard, refundpilot"
+    },
+    {
+      "id": "f0acb1ed-05a7-49da-8e77-30df8fb00f7a",
+      "timestamp": "2026-04-15T02:32:36.920Z",
+      "orgId": "org_508c1e5b-d6dc-4b4e-9f96-1113dc5c01b9",
+      "action": "settings_change",
+      "actorId": "508c1e5b-d6dc-4b4e-9f96-1113dc5c01b9",
+      "actorEmail": "admin@logai.dev",
+      "detail": "Organisation settings updated"
+    }
+  ]
+}

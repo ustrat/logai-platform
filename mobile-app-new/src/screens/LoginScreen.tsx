@@ -186,14 +186,14 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   button: {
-    backgroundColor: Colors.amber,
+    backgroundColor: Colors.navy,
     padding: 14,
     borderRadius: 4,
     alignItems: 'center',
     marginTop: 8,
   },
   buttonText: {
-    color: '#000',
+    color: '#ffffff',
     fontWeight: '700',
     fontSize: 12,
     letterSpacing: 2,

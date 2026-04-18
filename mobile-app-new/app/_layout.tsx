@@ -1,54 +1,69 @@
-import { Tabs } from 'expo-router';
-import { Colors } from '../../src/theme';
+import { useEffect, useState } from 'react';
+import { View, ActivityIndicator } from 'react-native';
+import { Stack } from 'expo-router';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { useAuthStore } from '../src/store/authStore';
+import { loadApiBase } from '../src/services/api';
+import { Colors } from '../src/theme';
+import { registerNotificationCategories, CATEGORY_ROUTES } from '../src/services/notifications';
+import * as Notifications from 'expo-notifications';
+import { router } from 'expo-router';
 
-export default function TabsLayout() {
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: { retry: 1, staleTime: 30_000 },
+  },
+});
+
+export default function RootLayout() {
+  const { loadToken } = useAuthStore();
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    // Load API base and auth token before rendering screens
+    // so all queries use the correct URL from the start
+    Promise.all([loadToken(), loadApiBase()]).then(() => setReady(true));
+    registerNotificationCategories();
+
+    // Route to the correct tab based on notification category
+    let responseSub: { remove: () => void } | null = null;
+    try {
+      responseSub = Notifications.addNotificationResponseReceivedListener(response => {
+        const actionId = response.actionIdentifier;
+        if (actionId === 'snooze') return;
+        const category = response.notification.request.content.data?.category as string | undefined;
+        const route = (category && CATEGORY_ROUTES[category]) || '/(tabs)/subscriptions';
+        router.push(route as any);
+      });
+    } catch { /* native module absent — notifications disabled */ }
+
+    return () => responseSub?.remove();
+  }, []);
+
+  if (!ready) {
+    return (
+      <View style={{ flex: 1, backgroundColor: Colors.bgBase, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator color={Colors.amber} />
+      </View>
+    );
+  }
+
   return (
-    <Tabs
-      screenOptions={{
-        headerStyle: { backgroundColor: Colors.bgSurface },
-        headerTintColor: Colors.textPrimary,
-        headerTitleStyle: { fontFamily: 'monospace', fontSize: 13, letterSpacing: 2 },
-        tabBarStyle: {
-          backgroundColor: Colors.bgSurface,
-          borderTopColor: Colors.border,
-          borderTopWidth: 1,
-          height: 60,
-          paddingBottom: 8,
-        },
-        tabBarActiveTintColor: Colors.amber,
-        tabBarInactiveTintColor: Colors.textMuted,
-        tabBarLabelStyle: { fontSize: 9, letterSpacing: 1.5, marginTop: 2 },
-      }}
-    >
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: 'DASHBOARD',
-          tabBarLabel: 'DASHBOARD',
-          tabBarIcon: ({ color }) => <TabIcon symbol="⬡" color={color} />,
+    <QueryClientProvider client={queryClient}>
+      <Stack
+        screenOptions={{
+          headerStyle: { backgroundColor: Colors.bgSurface },
+          headerTintColor: Colors.textPrimary,
+          headerTitleStyle: { fontFamily: 'monospace', fontSize: 13, letterSpacing: 2 },
+          contentStyle: { backgroundColor: Colors.bgBase },
         }}
-      />
-      <Tabs.Screen
-        name="anomalies"
-        options={{
-          title: 'ANOMALIES',
-          tabBarLabel: 'ANOMALIES',
-          tabBarIcon: ({ color }) => <TabIcon symbol="⚠" color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: 'PROFILE',
-          tabBarLabel: 'PROFILE',
-          tabBarIcon: ({ color }) => <TabIcon symbol="◉" color={color} />,
-        }}
-      />
-    </Tabs>
+      >
+        <Stack.Screen name="index" options={{ headerShown: false }} />
+        <Stack.Screen name="login" options={{ headerShown: false }} />
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="monitor" options={{ title: 'MONITOR' }} />
+        <Stack.Screen name="settings" options={{ title: 'SETTINGS' }} />
+      </Stack>
+    </QueryClientProvider>
   );
-}
-
-function TabIcon({ symbol, color }: { symbol: string; color: string }) {
-  const { Text } = require('react-native');
-  return <Text style={{ color, fontSize: 16 }}>{symbol}</Text>;
 }

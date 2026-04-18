@@ -70,6 +70,36 @@ class MLServiceClient {
       throw new Error(`ML service error: ${detail}`);
     }
   }
+
+  async getAccounts(): Promise<unknown> {
+    try {
+      const res = await this.client.get('/api/v1/inference/accounts');
+      return res.data;
+    } catch (err: any) {
+      const detail = err.response?.data?.detail || err.message;
+      throw new Error(`ML service error: ${detail}`);
+    }
+  }
+
+  async getSummary(): Promise<unknown> {
+    try {
+      const res = await this.client.get('/api/v1/inference/summary');
+      return res.data;
+    } catch (err: any) {
+      const detail = err.response?.data?.detail || err.message;
+      throw new Error(`ML service error: ${detail}`);
+    }
+  }
+
+  async reload(): Promise<unknown> {
+    try {
+      const res = await this.client.post('/api/v1/inference/reload');
+      return res.data;
+    } catch (err: any) {
+      const detail = err.response?.data?.detail || err.message;
+      throw new Error(`ML service error: ${detail}`);
+    }
+  }
 }
 
 export const mlClient = new MLServiceClient();

@@ -1,14 +1,27 @@
 import { Router, Request, Response } from 'express';
 import { plaidService } from '../services/plaidService';
 import { authenticate } from '../middleware/auth';
+import fs from 'fs';
+import path from 'path';
 
 const router = Router();
-
-// All Plaid routes require authentication
 router.use(authenticate);
 
-// In-memory token store — replace with DB in production
-const accessTokenStore: Record<string, { accessToken: string; itemId: string; connectedAt: string }> = {};
+// Persisted token store — survives server restarts
+const TOKEN_FILE = path.join(__dirname, '../../.plaid-tokens.json');
+
+function loadStore(): Record<string, { accessToken: string; itemId: string; connectedAt: string }> {
+  try {
+    if (fs.existsSync(TOKEN_FILE)) return JSON.parse(fs.readFileSync(TOKEN_FILE, 'utf8'));
+  } catch {}
+  return {};
+}
+
+function saveStore(store: Record<string, any>) {
+  try { fs.writeFileSync(TOKEN_FILE, JSON.stringify(store, null, 2)); } catch {}
+}
+
+const accessTokenStore = loadStore();
 
 /**
  * POST /api/v1/plaid/link-token
@@ -44,6 +57,7 @@ router.post('/exchange-token', async (req: Request, res: Response) => {
       itemId: data.item_id,
       connectedAt: new Date().toISOString(),
     };
+    saveStore(accessTokenStore);
 
     res.json({ success: true, data: { item_id: data.item_id, connected: true } });
   } catch (err: any) {
@@ -140,6 +154,7 @@ router.post('/sandbox/connect', async (req: Request, res: Response) => {
       itemId: exchanged.item_id,
       connectedAt: new Date().toISOString(),
     };
+    saveStore(accessTokenStore);
 
     res.json({ success: true, data: { item_id: exchanged.item_id, connected: true, note: 'Sandbox Chase account connected' } });
   } catch (err: any) {
@@ -172,6 +187,7 @@ router.get('/status', (req: Request, res: Response) => {
 router.delete('/disconnect', (req: Request, res: Response) => {
   const userId = (req as any).user.userId;
   delete accessTokenStore[userId];
+  saveStore(accessTokenStore);
   res.json({ success: true, data: { disconnected: true } });
 });
 

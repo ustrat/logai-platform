@@ -11,6 +11,7 @@ interface User {
 interface AuthStore {
   user: User | null;
   token: string | null;
+  isHydrated: boolean;
   setAuth: (user: User, token: string) => Promise<void>;
   logout: () => Promise<void>;
   loadToken: () => Promise<void>;
@@ -19,6 +20,7 @@ interface AuthStore {
 export const useAuthStore = create<AuthStore>((set) => ({
   user: null,
   token: null,
+  isHydrated: false,
 
   setAuth: async (user, token) => {
     await SecureStore.setItemAsync('token', token);
@@ -32,6 +34,6 @@ export const useAuthStore = create<AuthStore>((set) => ({
 
   loadToken: async () => {
     const token = await SecureStore.getItemAsync('token');
-    if (token) set({ token });
+    set({ token: token ?? null, isHydrated: true });
   },
 }));
