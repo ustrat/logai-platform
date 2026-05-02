@@ -13,8 +13,8 @@ import {
 } from '@aws-sdk/client-dynamodb';
 import { marshall, unmarshall } from '@aws-sdk/util-dynamodb';
 
-const STRIPE_KEY = process.env.STRIPE_SECRET_KEY ||
-  'REDACTED_USE_ENV_VAR';
+const STRIPE_KEY = process.env.STRIPE_SECRET_KEY;
+if (!STRIPE_KEY) throw new Error('STRIPE_SECRET_KEY env var is required');
 
 const TABLE  = process.env.CATALOG_TABLE || 'vp-catalog-production';
 const PK     = 'CATALOG#PRODUCTS';

@@ -67,9 +67,41 @@
       "notes": "",
       "assignedBy": "508c1e5b-d6dc-4b4e-9f96-1113dc5c01b9",
       "assignedAt": "2026-04-15T02:35:03.516Z"
+    },
+    {
+      "id": "ad9d07de-098c-4f4e-927c-a6af44d7831c",
+      "orgId": "org_ac32e996-adbc-4144-8c22-7fb1693686a0",
+      "email": "dfadfasdf",
+      "name": "sdafga",
+      "department": "asdfasdf",
+      "jobTitle": "",
+      "role": "user",
+      "productKeys": [
+        "renewalguard"
+      ],
+      "status": "active",
+      "accessLevel": "standard",
+      "agencyCode": "",
+      "cacEnabled": false,
+      "clearanceLevel": "None",
+      "costCenter": "",
+      "notes": "",
+      "assignedBy": "ac32e996-adbc-4144-8c22-7fb1693686a0",
+      "assignedAt": "2026-04-18T12:14:43.594Z"
     }
   ],
   "audit": [
+    {
+      "id": "81e55903-90ce-4b2a-ba77-1c6a8a6d1055",
+      "timestamp": "2026-04-18T12:14:43.596Z",
+      "orgId": "org_ac32e996-adbc-4144-8c22-7fb1693686a0",
+      "action": "assign",
+      "actorId": "ac32e996-adbc-4144-8c22-7fb1693686a0",
+      "actorEmail": "admin@logai.dev",
+      "targetEmail": "dfadfasdf",
+      "targetName": "sdafga",
+      "detail": "Licence assigned for renewalguard"
+    },
     {
       "id": "ae1cd5bc-6217-4c60-8ca1-f8221d1e0039",
       "timestamp": "2026-04-15T02:35:25.956Z",
