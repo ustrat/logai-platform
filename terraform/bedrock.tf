@@ -1,7 +1,7 @@
 # ══════════════════════════════════════════════════════════════════════════════
 #  AWS Bedrock — IAM permissions for all platform roles
 #  Models used:
-#    claude-3-5-sonnet  → complex reasoning (enterprise assistant, anomaly explain)
+#    claude-4-6-sonnet  → complex reasoning (enterprise assistant, anomaly explain)
 #    claude-3-5-haiku   → high-volume fast inference (email signals, subscription scan)
 # ══════════════════════════════════════════════════════════════════════════════
 

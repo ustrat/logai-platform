@@ -3,11 +3,15 @@ export interface JwtPayload {
   userId: string;
   email: string;
   role: 'admin' | 'analyst' | 'viewer';
+  /** Distinguishes access tokens from refresh tokens so they cannot be cross-used. */
+  type: 'access';
 }
 
 export interface AuthUser extends JwtPayload {
   iat: number;
   exp: number;
+  plan?: string;
+  entitlementsVersion?: string | null;
 }
 
 // ── API responses ─────────────────────────────────────────────

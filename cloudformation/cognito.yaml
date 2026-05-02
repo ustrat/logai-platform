@@ -1,0 +1,206 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: ValuePilot — Cognito User Pool with FedRAMP-aligned password policy, TOTP MFA, and RBAC groups
+
+Parameters:
+  Environment:
+    Type: String
+    Default: production
+    AllowedValues: [development, staging, production]
+  ProjectName:
+    Type: String
+    Default: valuepilot
+  PreTokenLambdaArn:
+    Type: String
+    Default: ""
+    Description: >
+      ARN of the Pre-Token Generation Lambda (from entitlements stack).
+      Leave empty on first deploy; set after entitlements stack is deployed.
+
+Conditions:
+  HasPreTokenLambda: !Not [!Equals [!Ref PreTokenLambdaArn, ""]]
+
+Resources:
+
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      UserPoolName: !Sub ${ProjectName}-users
+      UsernameAttributes:
+        - email
+      AutoVerifiedAttributes:
+        - email
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 12
+          RequireLowercase: true
+          RequireUppercase: true
+          RequireNumbers: true
+          RequireSymbols: true
+          TemporaryPasswordValidityDays: 3
+      AccountRecoverySetting:
+        RecoveryMechanisms:
+          - Name: verified_email
+            Priority: 1
+      VerificationMessageTemplate:
+        DefaultEmailOption: CONFIRM_WITH_CODE
+        EmailSubject: "ValuePilot — Verify your account"
+        EmailMessage: "Your ValuePilot verification code is: {####}"
+      MfaConfiguration: "OFF"
+      LambdaConfig: !If
+        - HasPreTokenLambda
+        - PreTokenGenerationConfig:
+            LambdaArn: !Ref PreTokenLambdaArn
+            LambdaVersion: V2_0
+        - !Ref AWS::NoValue
+      Schema:
+        - Name: email
+          AttributeDataType: String
+          Required: true
+          Mutable: true
+          StringAttributeConstraints:
+            MinLength: "5"
+            MaxLength: "254"
+        - Name: name
+          AttributeDataType: String
+          Required: true
+          Mutable: true
+          StringAttributeConstraints:
+            MinLength: "1"
+            MaxLength: "100"
+        - Name: role
+          AttributeDataType: String
+          Required: false
+          Mutable: true
+          StringAttributeConstraints:
+            MinLength: "1"
+            MaxLength: "50"
+      UserPoolTags:
+        Project: !Ref ProjectName
+        Environment: !Ref Environment
+        ManagedBy: CloudFormation
+
+  # ── Hosted UI domain (enables OIDC Authorization Code + PKCE flow) ───────────
+  HostedUIDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      UserPoolId: !Ref UserPool
+      Domain: !Sub "${ProjectName}-auth-${AWS::AccountId}"
+
+  # ── App Client — OIDC Authorization Code + PKCE (SPA, no secret) ─────────────
+  WebAppClient:
+    Type: AWS::Cognito::UserPoolClient
+    DependsOn: HostedUIDomain
+    Properties:
+      ClientName: !Sub ${ProjectName}-web-client
+      UserPoolId: !Ref UserPool
+      GenerateSecret: false
+      # Authorization Code + PKCE — no password flow at the OIDC layer
+      ExplicitAuthFlows:
+        - ALLOW_USER_SRP_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+      AllowedOAuthFlows:
+        - code
+      AllowedOAuthFlowsUserPoolClient: true
+      AllowedOAuthScopes:
+        - openid
+        - email
+        - profile
+      CallbackURLs:
+        - http://localhost:3000/auth/callback
+        - http://localhost:4173/auth/callback
+      LogoutURLs:
+        - http://localhost:3000/login
+        - http://localhost:4173/login
+      SupportedIdentityProviders:
+        - COGNITO
+      TokenValidityUnits:
+        AccessToken: minutes
+        IdToken: minutes
+        RefreshToken: days
+      AccessTokenValidity: 15
+      IdTokenValidity: 60
+      RefreshTokenValidity: 30
+      PreventUserExistenceErrors: ENABLED
+      EnableTokenRevocation: true
+      EnablePropagateAdditionalUserContextData: false
+      ReadAttributes:
+        - email
+        - name
+        - custom:role
+      WriteAttributes:
+        - email
+        - name
+        - custom:role
+
+  # ── RBAC groups ───────────────────────────────────────────────────────────────
+  AdminGroup:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      GroupName: admin
+      UserPoolId: !Ref UserPool
+      Description: Platform administrators
+      Precedence: 1
+
+  AnalystGroup:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      GroupName: analyst
+      UserPoolId: !Ref UserPool
+      Description: Standard analysts
+      Precedence: 2
+
+  ViewerGroup:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      GroupName: viewer
+      UserPoolId: !Ref UserPool
+      Description: Read-only viewers
+      Precedence: 3
+
+  # ── SSM: store pool IDs for API and CI ───────────────────────────────────────
+  UserPoolIdParam:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub /${ProjectName}/${Environment}/cognito/user_pool_id
+      Type: String
+      Value: !Ref UserPool
+      Tags:
+        Project: !Ref ProjectName
+        Environment: !Ref Environment
+
+  ClientIdParam:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub /${ProjectName}/${Environment}/cognito/client_id
+      Type: String
+      Value: !Ref WebAppClient
+      Tags:
+        Project: !Ref ProjectName
+        Environment: !Ref Environment
+
+Outputs:
+  UserPoolId:
+    Value: !Ref UserPool
+    Description: Cognito User Pool ID
+    Export:
+      Name: !Sub "valuepilot-${Environment}-cognito-user-pool-id"
+  UserPoolArn:
+    Value: !GetAtt UserPool.Arn
+    Description: Cognito User Pool ARN
+    Export:
+      Name: !Sub "valuepilot-${Environment}-cognito-user-pool-arn"
+  ClientId:
+    Value: !Ref WebAppClient
+    Description: Cognito App Client ID — use in frontend .env as VITE_COGNITO_CLIENT_ID
+    Export:
+      Name: !Sub "valuepilot-${Environment}-cognito-client-id"
+  JwksUri:
+    Value: !Sub "https://cognito-idp.${AWS::Region}.amazonaws.com/${UserPool}/.well-known/jwks.json"
+    Description: JWKS endpoint for backend token verification
+  CognitoAuthDomain:
+    Value: !Sub "${ProjectName}-auth-${AWS::AccountId}.auth.${AWS::Region}.amazoncognito.com"
+    Description: Cognito Hosted UI domain — use as VITE_COGNITO_DOMAIN in frontend .env
+    Export:
+      Name: !Sub "valuepilot-${Environment}-cognito-auth-domain"

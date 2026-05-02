@@ -1,28 +1,16 @@
-import axios from 'axios';
-
-const API_BASE = 'http://localhost:4000/api/v1';
-
-function authHeader() {
-  const token = localStorage.getItem('token');
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
-
-const client = axios.create({ baseURL: API_BASE });
+import api from './api';
 
 export const paymentsApi = {
-  /** Fetch all active products + prices from Stripe */
-  getProducts: () =>
-    client.get('/payments/products', { headers: authHeader() }),
-
-  /** Get all active subscriptions for the current user */
-  getSubscription: () =>
-    client.get('/payments/subscription', { headers: authHeader() }),
-
-  /** Create Stripe Checkout session using a Stripe price ID directly */
+  getProducts:           ()                                               => api.get('/payments/products'),
+  getSubscription:       ()                                               => api.get('/payments/subscription'),
   createCheckoutSession: (priceId: string, successUrl: string, cancelUrl: string) =>
-    client.post('/payments/checkout', { priceId, successUrl, cancelUrl }, { headers: authHeader() }),
+    api.post('/payments/checkout', { priceId, successUrl, cancelUrl }),
+  createPortalSession:   ()                                               => api.post('/payments/portal', {}),
+};
 
-  /** Create Stripe Customer Portal session */
-  createPortalSession: () =>
-    client.post('/payments/portal', {}, { headers: authHeader() }),
+export const catalogApi = {
+  getProducts:  ()                                                         => api.get('/catalog/products'),
+  getProduct:   (productKey: string)                                       => api.get(`/catalog/products/${productKey}`),
+  seed:         ()                                                         => api.post('/catalog/seed'),
+  syncStripe:   ()                                                         => api.post('/catalog/sync-stripe'),
 };

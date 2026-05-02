@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { cognitoSignOut } from '../services/cognitoAuth';
 
 interface User {
   id: string;
@@ -9,20 +10,32 @@ interface User {
 
 interface AuthStore {
   user: User | null;
-  token: string | null;
-  setAuth: (user: User, token: string) => void;
+  token: string | null;      // idToken — sent as Bearer to API
+  refreshToken: string | null;
+  setAuth: (user: User, idToken: string, refreshToken: string) => void;
   logout: () => void;
 }
 
+const stored = (() => {
+  try {
+    const raw = localStorage.getItem('vp_auth');
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+})();
+
 export const useAuthStore = create<AuthStore>((set) => ({
-  user: null,
-  token: localStorage.getItem('token'),
-  setAuth: (user, token) => {
-    localStorage.setItem('token', token);
-    set({ user, token });
+  user:         stored?.user         ?? null,
+  token:        stored?.token        ?? null,
+  refreshToken: stored?.refreshToken ?? null,
+
+  setAuth: (user, idToken, refreshToken) => {
+    localStorage.setItem('vp_auth', JSON.stringify({ user, token: idToken, refreshToken }));
+    set({ user, token: idToken, refreshToken });
   },
+
   logout: () => {
-    localStorage.removeItem('token');
-    set({ user: null, token: null });
+    cognitoSignOut();
+    localStorage.removeItem('vp_auth');
+    set({ user: null, token: null, refreshToken: null });
   },
 }));

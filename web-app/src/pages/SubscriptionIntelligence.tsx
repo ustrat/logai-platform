@@ -61,12 +61,13 @@ export default function SubscriptionIntelligence() {
   const [sortBy, setSortBy] = useState<'annualCost' | 'confidence' | 'nextExpected'>('annualCost');
   const [search, setSearch] = useState('');
 
-  const { data, isLoading, isError, refetch } = useQuery({
+  const { data, isLoading, isError, isFetching, refetch } = useQuery({
     queryKey: ['subscriptions'],
     queryFn: async () => {
       const res = await api.get('/subscriptions?days=365&min_confidence=0.4');
       return res.data.data as { subscriptions: Subscription[]; summary: Summary; metadata: any };
     },
+    retry: false,
   });
 
   const subs = data?.subscriptions || [];
@@ -93,7 +94,13 @@ export default function SubscriptionIntelligence() {
           <h1 style={S.title}>Subscription Intelligence</h1>
           <p style={S.subtitle}>AI-detected recurring charges from Plaid transaction history</p>
         </div>
-        <button onClick={() => refetch()} style={S.refreshBtn}>↺ Re-analyze</button>
+        <button
+          onClick={() => refetch()}
+          disabled={isFetching}
+          style={{ ...S.refreshBtn, opacity: isFetching ? 0.6 : 1, cursor: isFetching ? 'wait' : 'pointer' }}
+        >
+          {isFetching ? '⟳ Analyzing...' : '↺ Re-analyze'}
+        </button>
       </div>
 
       {isError && (

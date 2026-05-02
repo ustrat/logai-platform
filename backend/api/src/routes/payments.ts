@@ -1,75 +1,76 @@
 import { Router, Request, Response } from 'express';
 import Stripe from 'stripe';
 import { authenticate } from '../middleware/auth';
+import { getSecrets } from '../lib/secretsManager';
+import { resolveStripePriceId, getAllProducts } from '../lib/catalogService';
 
 const router = Router();
 
-const STRIPE_KEY = process.env.STRIPE_SECRET_KEY || '';
-const stripe     = new Stripe(STRIPE_KEY, { apiVersion: '2024-06-20' });
+// Lazy Stripe client — secrets are loaded at startup before any requests arrive
+let _stripe: Stripe | null = null;
+function stripe(): Stripe {
+  if (!_stripe) _stripe = new Stripe(getSecrets().stripe.secretKey, { apiVersion: '2024-06-20' });
+  return _stripe;
+}
 
 router.use(authenticate);
 
 // ── GET /api/v1/payments/products ─────────────────────────────────────────────
-// Fetches all active products + their prices live from Stripe.
-// Frontend renders whatever exists in the account — no hardcoding needed.
+// Returns products from DynamoDB price book (not live from Stripe).
+// Stripe price IDs are resolved server-side only during checkout.
 router.get('/products', async (_req: Request, res: Response) => {
   try {
-    const [products, prices] = await Promise.all([
-      stripe.products.list({ active: true, limit: 100 }),
-      stripe.prices.list({ active: true, limit: 100 }),
-    ]);
-
-    // Group prices by product
-    const pricesByProduct: Record<string, Stripe.Price[]> = {};
-    for (const price of prices.data) {
-      const productId = typeof price.product === 'string' ? price.product : price.product.id;
-      if (!pricesByProduct[productId]) pricesByProduct[productId] = [];
-      pricesByProduct[productId].push(price);
-    }
-
-    const catalog = products.data
-      .filter(p => pricesByProduct[p.id]?.length > 0)
-      .map(product => ({
-        productId:   product.id,
-        name:        product.name,
-        description: product.description || '',
-        images:      product.images,
-        metadata:    product.metadata,
-        prices:      (pricesByProduct[product.id] || []).map(price => ({
-          priceId:   price.id,
-          amount:    price.unit_amount,
-          currency:  price.currency,
-          interval:  price.recurring?.interval ?? null,
-          intervalCount: price.recurring?.interval_count ?? 1,
-        })),
-      }))
-      .sort((a, b) => a.name.localeCompare(b.name));
-
-    res.json({ success: true, data: { products: catalog } });
+    const products = await getAllProducts();
+    const safe = products.map(p => ({
+      productId:   p.productKey,
+      name:        p.name,
+      description: p.description,
+      metadata:    Object.fromEntries((p.features ?? []).map((f, i) => [`feature_${String(i + 1).padStart(2, '0')}`, f])),
+      prices: [
+        ...(p.prices.monthly ? [{ priceId: `${p.productKey}::monthly`, amount: p.prices.monthly, currency: 'usd', interval: 'month', intervalCount: 1 }] : []),
+        ...(p.prices.annual  ? [{ priceId: `${p.productKey}::annual`,  amount: p.prices.annual,  currency: 'usd', interval: 'year',  intervalCount: 1 }] : []),
+      ],
+    }));
+    res.json({ success: true, data: { products: safe } });
   } catch (err: any) {
-    console.error('Stripe products error:', err.message);
+    console.error('Catalog products error:', err.message);
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
 // ── POST /api/v1/payments/checkout ────────────────────────────────────────────
 // Body: { priceId, successUrl, cancelUrl }
+// priceId may be a raw Stripe price ID (price_xxx) OR the DynamoDB-keyed
+// format "productKey::monthly" / "productKey::annual"
 router.post('/checkout', async (req: Request, res: Response) => {
   try {
     const user = (req as any).user;
-    const { priceId, successUrl, cancelUrl } = req.body;
+    let { priceId, successUrl, cancelUrl } = req.body;
 
     if (!priceId || !successUrl || !cancelUrl) {
       return res.status(400).json({ success: false, error: 'priceId, successUrl, and cancelUrl are required' });
     }
 
-    // Validate price exists in Stripe
-    const price = await stripe.prices.retrieve(priceId).catch(() => null);
+    // Resolve virtual price IDs from DynamoDB when using "productKey::period" format
+    if (priceId.includes('::')) {
+      const [productKey, period] = priceId.split('::') as [string, 'monthly' | 'annual'];
+      const resolved = await resolveStripePriceId(productKey, period);
+      if (!resolved) {
+        return res.status(400).json({
+          success: false,
+          error: `No Stripe price synced for ${productKey} (${period}). Run POST /api/v1/catalog/sync-stripe first.`,
+        });
+      }
+      priceId = resolved;
+    }
+
+    // Validate the resolved Stripe price exists
+    const price = await stripe().prices.retrieve(priceId).catch(() => null);
     if (!price || !price.active) {
       return res.status(400).json({ success: false, error: 'Invalid or inactive price' });
     }
 
-    const session = await stripe.checkout.sessions.create({
+    const session = await stripe().checkout.sessions.create({
       mode: 'subscription',
       line_items: [{ price: priceId, quantity: 1 }],
       customer_email: user.email,
@@ -97,12 +98,12 @@ router.get('/subscription', async (req: Request, res: Response) => {
   try {
     const user = (req as any).user;
 
-    const customers = await stripe.customers.list({ email: user.email, limit: 1 });
+    const customers = await stripe().customers.list({ email: user.email, limit: 1 });
     if (!customers.data.length) {
       return res.json({ success: true, data: { subscriptions: [] } });
     }
 
-    const subs = await stripe.subscriptions.list({
+    const subs = await stripe().subscriptions.list({
       customer: customers.data[0].id,
       status: 'all',
       limit: 20,
@@ -137,12 +138,12 @@ router.post('/portal', async (req: Request, res: Response) => {
     const user      = (req as any).user;
     const returnUrl = req.body.returnUrl || `${process.env.APP_URL || 'http://localhost:3000'}/pricing`;
 
-    const customers = await stripe.customers.list({ email: user.email, limit: 1 });
+    const customers = await stripe().customers.list({ email: user.email, limit: 1 });
     if (!customers.data.length) {
       return res.status(404).json({ success: false, error: 'No billing account found' });
     }
 
-    const portal = await stripe.billingPortal.sessions.create({
+    const portal = await stripe().billingPortal.sessions.create({
       customer:   customers.data[0].id,
       return_url: returnUrl,
     });

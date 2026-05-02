@@ -1,0 +1,481 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: ValuePilot — CloudWatch log groups, metric alarms, and operations dashboard
+
+Parameters:
+  Environment:
+    Type: String
+    Default: production
+    AllowedValues: [development, staging, production]
+  LogRetentionDays:
+    Type: Number
+    Default: 30
+  LambdaErrorThreshold:
+    Type: Number
+    Default: 3
+    Description: Number of Lambda errors per hour before alarm triggers
+
+Resources:
+
+  # ── Log groups: Renewal Alert Lambda functions (7) ────────────────────────────
+  LogGroupCancellationDeadline:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName: !Sub /aws/lambda/valuepilot-cancellation-deadline-${Environment}
+      RetentionInDays: !Ref LogRetentionDays
+      Tags:
+        - Key: Project
+          Value: ValuePilot
+        - Key: Environment
+          Value: !Ref Environment
+
+  LogGroupHighRiskAccounts:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName: !Sub /aws/lambda/valuepilot-high-risk-accounts-${Environment}
+      RetentionInDays: !Ref LogRetentionDays
+      Tags:
+        - Key: Project
+          Value: ValuePilot
+        - Key: Environment
+          Value: !Ref Environment
+
+  LogGroupPriceShock:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName: !Sub /aws/lambda/valuepilot-price-shock-${Environment}
+      RetentionInDays: !Ref LogRetentionDays
+      Tags:
+        - Key: Project
+          Value: ValuePilot
+        - Key: Environment
+          Value: !Ref Environment
+
+  LogGroupUsageDecline:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName: !Sub /aws/lambda/valuepilot-usage-decline-${Environment}
+      RetentionInDays: !Ref LogRetentionDays
+      Tags:
+        - Key: Project
+          Value: ValuePilot
+        - Key: Environment
+          Value: !Ref Environment
+
+  LogGroupPendingApprovals:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName: !Sub /aws/lambda/valuepilot-pending-approvals-${Environment}
+      RetentionInDays: !Ref LogRetentionDays
+      Tags:
+        - Key: Project
+          Value: ValuePilot
+        - Key: Environment
+          Value: !Ref Environment
+
+  LogGroupIncompleteEvidence:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName: !Sub /aws/lambda/valuepilot-incomplete-evidence-${Environment}
+      RetentionInDays: !Ref LogRetentionDays
+      Tags:
+        - Key: Project
+          Value: ValuePilot
+        - Key: Environment
+          Value: !Ref Environment
+
+  LogGroupAutoRenewDisabled:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName: !Sub /aws/lambda/valuepilot-auto-renew-disabled-${Environment}
+      RetentionInDays: !Ref LogRetentionDays
+      Tags:
+        - Key: Project
+          Value: ValuePilot
+        - Key: Environment
+          Value: !Ref Environment
+
+  # ── Log group: Email Intelligence Lambda ──────────────────────────────────────
+  LogGroupEmailIntel:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName: !Sub /aws/lambda/valuepilot-email-intel-scan-${Environment}
+      RetentionInDays: !Ref LogRetentionDays
+      Tags:
+        - Key: Project
+          Value: ValuePilot
+        - Key: Environment
+          Value: !Ref Environment
+
+  # ── Log group: API backend ────────────────────────────────────────────────────
+  LogGroupApi:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName: !Sub /valuepilot/api/${Environment}
+      RetentionInDays: !Ref LogRetentionDays
+      Tags:
+        - Key: Project
+          Value: ValuePilot
+        - Key: Environment
+          Value: !Ref Environment
+
+  # ── Alarms: Email Intelligence Lambda ─────────────────────────────────────────
+  AlarmEmailIntelErrors:
+    Type: AWS::CloudWatch::Alarm
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      AlarmName: !Sub valuepilot-email-intel-errors-${Environment}
+      AlarmDescription: Email Intel Lambda is throwing errors
+      MetricName: Errors
+      Namespace: AWS/Lambda
+      Statistic: Sum
+      Period: 3600
+      EvaluationPeriods: 1
+      Threshold: !Ref LambdaErrorThreshold
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      Dimensions:
+        - Name: FunctionName
+          Value: !Sub valuepilot-email-intel-scan-${Environment}
+      AlarmActions:
+        - Fn::ImportValue:
+            Fn::Sub: "valuepilot-${Environment}-cw-alarms-topic-arn"
+      OKActions:
+        - Fn::ImportValue:
+            Fn::Sub: "valuepilot-${Environment}-cw-alarms-topic-arn"
+
+  AlarmEmailIntelTimeout:
+    Type: AWS::CloudWatch::Alarm
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      AlarmName: !Sub valuepilot-email-intel-timeout-${Environment}
+      AlarmDescription: Email Intel Lambda is approaching 10-minute timeout
+      MetricName: Duration
+      Namespace: AWS/Lambda
+      Statistic: Maximum
+      Period: 3600
+      EvaluationPeriods: 1
+      Threshold: 480000
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      Dimensions:
+        - Name: FunctionName
+          Value: !Sub valuepilot-email-intel-scan-${Environment}
+      AlarmActions:
+        - Fn::ImportValue:
+            Fn::Sub: "valuepilot-${Environment}-cw-alarms-topic-arn"
+
+  # ── Alarms: Renewal Alert Lambda functions (one per function) ─────────────────
+  AlarmCancellationDeadlineErrors:
+    Type: AWS::CloudWatch::Alarm
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      AlarmName: !Sub valuepilot-cancellation-deadline-errors-${Environment}
+      AlarmDescription: valuepilot-cancellation-deadline Lambda is throwing errors
+      MetricName: Errors
+      Namespace: AWS/Lambda
+      Statistic: Sum
+      Period: 3600
+      EvaluationPeriods: 1
+      Threshold: !Ref LambdaErrorThreshold
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      Dimensions:
+        - Name: FunctionName
+          Value: !Sub valuepilot-cancellation-deadline-${Environment}
+      AlarmActions:
+        - Fn::ImportValue:
+            Fn::Sub: "valuepilot-${Environment}-cw-alarms-topic-arn"
+      OKActions:
+        - Fn::ImportValue:
+            Fn::Sub: "valuepilot-${Environment}-cw-alarms-topic-arn"
+
+  AlarmHighRiskAccountsErrors:
+    Type: AWS::CloudWatch::Alarm
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      AlarmName: !Sub valuepilot-high-risk-accounts-errors-${Environment}
+      AlarmDescription: valuepilot-high-risk-accounts Lambda is throwing errors
+      MetricName: Errors
+      Namespace: AWS/Lambda
+      Statistic: Sum
+      Period: 3600
+      EvaluationPeriods: 1
+      Threshold: !Ref LambdaErrorThreshold
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      Dimensions:
+        - Name: FunctionName
+          Value: !Sub valuepilot-high-risk-accounts-${Environment}
+      AlarmActions:
+        - Fn::ImportValue:
+            Fn::Sub: "valuepilot-${Environment}-cw-alarms-topic-arn"
+      OKActions:
+        - Fn::ImportValue:
+            Fn::Sub: "valuepilot-${Environment}-cw-alarms-topic-arn"
+
+  AlarmPriceShockErrors:
+    Type: AWS::CloudWatch::Alarm
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      AlarmName: !Sub valuepilot-price-shock-errors-${Environment}
+      AlarmDescription: valuepilot-price-shock Lambda is throwing errors
+      MetricName: Errors
+      Namespace: AWS/Lambda
+      Statistic: Sum
+      Period: 3600
+      EvaluationPeriods: 1
+      Threshold: !Ref LambdaErrorThreshold
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      Dimensions:
+        - Name: FunctionName
+          Value: !Sub valuepilot-price-shock-${Environment}
+      AlarmActions:
+        - Fn::ImportValue:
+            Fn::Sub: "valuepilot-${Environment}-cw-alarms-topic-arn"
+      OKActions:
+        - Fn::ImportValue:
+            Fn::Sub: "valuepilot-${Environment}-cw-alarms-topic-arn"
+
+  AlarmUsageDeclineErrors:
+    Type: AWS::CloudWatch::Alarm
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      AlarmName: !Sub valuepilot-usage-decline-errors-${Environment}
+      AlarmDescription: valuepilot-usage-decline Lambda is throwing errors
+      MetricName: Errors
+      Namespace: AWS/Lambda
+      Statistic: Sum
+      Period: 3600
+      EvaluationPeriods: 1
+      Threshold: !Ref LambdaErrorThreshold
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      Dimensions:
+        - Name: FunctionName
+          Value: !Sub valuepilot-usage-decline-${Environment}
+      AlarmActions:
+        - Fn::ImportValue:
+            Fn::Sub: "valuepilot-${Environment}-cw-alarms-topic-arn"
+      OKActions:
+        - Fn::ImportValue:
+            Fn::Sub: "valuepilot-${Environment}-cw-alarms-topic-arn"
+
+  AlarmPendingApprovalsErrors:
+    Type: AWS::CloudWatch::Alarm
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      AlarmName: !Sub valuepilot-pending-approvals-errors-${Environment}
+      AlarmDescription: valuepilot-pending-approvals Lambda is throwing errors
+      MetricName: Errors
+      Namespace: AWS/Lambda
+      Statistic: Sum
+      Period: 3600
+      EvaluationPeriods: 1
+      Threshold: !Ref LambdaErrorThreshold
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      Dimensions:
+        - Name: FunctionName
+          Value: !Sub valuepilot-pending-approvals-${Environment}
+      AlarmActions:
+        - Fn::ImportValue:
+            Fn::Sub: "valuepilot-${Environment}-cw-alarms-topic-arn"
+      OKActions:
+        - Fn::ImportValue:
+            Fn::Sub: "valuepilot-${Environment}-cw-alarms-topic-arn"
+
+  AlarmIncompleteEvidenceErrors:
+    Type: AWS::CloudWatch::Alarm
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      AlarmName: !Sub valuepilot-incomplete-evidence-errors-${Environment}
+      AlarmDescription: valuepilot-incomplete-evidence Lambda is throwing errors
+      MetricName: Errors
+      Namespace: AWS/Lambda
+      Statistic: Sum
+      Period: 3600
+      EvaluationPeriods: 1
+      Threshold: !Ref LambdaErrorThreshold
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      Dimensions:
+        - Name: FunctionName
+          Value: !Sub valuepilot-incomplete-evidence-${Environment}
+      AlarmActions:
+        - Fn::ImportValue:
+            Fn::Sub: "valuepilot-${Environment}-cw-alarms-topic-arn"
+      OKActions:
+        - Fn::ImportValue:
+            Fn::Sub: "valuepilot-${Environment}-cw-alarms-topic-arn"
+
+  AlarmAutoRenewDisabledErrors:
+    Type: AWS::CloudWatch::Alarm
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      AlarmName: !Sub valuepilot-auto-renew-disabled-errors-${Environment}
+      AlarmDescription: valuepilot-auto-renew-disabled Lambda is throwing errors
+      MetricName: Errors
+      Namespace: AWS/Lambda
+      Statistic: Sum
+      Period: 3600
+      EvaluationPeriods: 1
+      Threshold: !Ref LambdaErrorThreshold
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      Dimensions:
+        - Name: FunctionName
+          Value: !Sub valuepilot-auto-renew-disabled-${Environment}
+      AlarmActions:
+        - Fn::ImportValue:
+            Fn::Sub: "valuepilot-${Environment}-cw-alarms-topic-arn"
+      OKActions:
+        - Fn::ImportValue:
+            Fn::Sub: "valuepilot-${Environment}-cw-alarms-topic-arn"
+
+  # ── Alarms: DLQ depth ─────────────────────────────────────────────────────────
+  AlarmAlertsDlqDepth:
+    Type: AWS::CloudWatch::Alarm
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      AlarmName: !Sub valuepilot-alerts-dlq-depth-${Environment}
+      AlarmDescription: Renewal alerts DLQ has unprocessed messages
+      MetricName: ApproximateNumberOfMessagesVisible
+      Namespace: AWS/SQS
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      Dimensions:
+        - Name: QueueName
+          Value:
+            Fn::ImportValue:
+              Fn::Sub: "valuepilot-${Environment}-alerts-dlq-name"
+      AlarmActions:
+        - Fn::ImportValue:
+            Fn::Sub: "valuepilot-${Environment}-cw-alarms-topic-arn"
+
+  AlarmEmailIntelDlqDepth:
+    Type: AWS::CloudWatch::Alarm
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      AlarmName: !Sub valuepilot-email-intel-dlq-depth-${Environment}
+      AlarmDescription: Email Intel DLQ has unprocessed messages
+      MetricName: ApproximateNumberOfMessagesVisible
+      Namespace: AWS/SQS
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      Dimensions:
+        - Name: QueueName
+          Value:
+            Fn::ImportValue:
+              Fn::Sub: "valuepilot-${Environment}-email-intel-dlq-name"
+      AlarmActions:
+        - Fn::ImportValue:
+            Fn::Sub: "valuepilot-${Environment}-cw-alarms-topic-arn"
+
+  # ── Dashboard ─────────────────────────────────────────────────────────────────
+  Dashboard:
+    Type: AWS::CloudWatch::Dashboard
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      DashboardName: !Sub ValuePilot-${Environment}
+      DashboardBody: !Sub |-
+        {
+          "widgets": [
+            {
+              "type": "metric",
+              "x": 0, "y": 0, "width": 12, "height": 6,
+              "properties": {
+                "title": "Lambda Errors — All Functions",
+                "region": "${AWS::Region}",
+                "period": 3600,
+                "stat": "Sum",
+                "view": "timeSeries",
+                "stacked": false,
+                "metrics": [
+                  ["AWS/Lambda", "Errors", "FunctionName", "valuepilot-cancellation-deadline-${Environment}"],
+                  ["AWS/Lambda", "Errors", "FunctionName", "valuepilot-high-risk-accounts-${Environment}"],
+                  ["AWS/Lambda", "Errors", "FunctionName", "valuepilot-price-shock-${Environment}"],
+                  ["AWS/Lambda", "Errors", "FunctionName", "valuepilot-usage-decline-${Environment}"],
+                  ["AWS/Lambda", "Errors", "FunctionName", "valuepilot-pending-approvals-${Environment}"],
+                  ["AWS/Lambda", "Errors", "FunctionName", "valuepilot-incomplete-evidence-${Environment}"],
+                  ["AWS/Lambda", "Errors", "FunctionName", "valuepilot-auto-renew-disabled-${Environment}"],
+                  ["AWS/Lambda", "Errors", "FunctionName", "valuepilot-email-intel-scan-${Environment}"]
+                ]
+              }
+            },
+            {
+              "type": "metric",
+              "x": 12, "y": 0, "width": 12, "height": 6,
+              "properties": {
+                "title": "DLQ Depth",
+                "region": "${AWS::Region}",
+                "period": 300,
+                "stat": "Sum",
+                "view": "timeSeries",
+                "stacked": false,
+                "metrics": [
+                  ["AWS/SQS", "ApproximateNumberOfMessagesVisible", "QueueName", "valuepilot-event-dlq-${Environment}"],
+                  ["AWS/SQS", "ApproximateNumberOfMessagesVisible", "QueueName", "valuepilot-email-intel-dlq-${Environment}"]
+                ]
+              }
+            },
+            {
+              "type": "metric",
+              "x": 0, "y": 6, "width": 12, "height": 6,
+              "properties": {
+                "title": "Email Intel Lambda Duration",
+                "region": "${AWS::Region}",
+                "period": 3600,
+                "stat": "Maximum",
+                "view": "timeSeries",
+                "stacked": false,
+                "metrics": [
+                  ["AWS/Lambda", "Duration", "FunctionName", "valuepilot-email-intel-scan-${Environment}"]
+                ]
+              }
+            }
+          ]
+        }
+
+Outputs:
+  DashboardUrl:
+    Value: !Sub "https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=ValuePilot-${Environment}"
+    Description: Direct link to the ValuePilot CloudWatch dashboard

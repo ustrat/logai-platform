@@ -37,7 +37,7 @@ export default function PlaidConnect() {
 
   // Check if already connected on mount
   useEffect(() => {
-  const token = localStorage.getItem('token');
+  const token = (() => { try { const r = localStorage.getItem('vp_auth'); return r ? JSON.parse(r).token : null; } catch { return null; } })();
   if (!token) return;
   api.get('/plaid/status').then(res => {
     if (res.data.data.connected) {

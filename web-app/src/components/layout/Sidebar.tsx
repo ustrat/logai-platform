@@ -1,10 +1,12 @@
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink } from 'react-router-dom';
+import { useAuth } from '../../auth/AuthProvider';
 import { useAuthStore } from '../../store/authStore';
 import {
   LayoutDashboard, AlertTriangle, TrendingUp, Settings, LogOut,
   Activity, ChevronLeft, ChevronRight, RefreshCw, CreditCard,
   List, Briefcase, Eye, FileSearch, ClipboardCheck, BarChart2,
   Target, Repeat, Sparkles, Building2, DollarSign, Mail, Brain,
+  Bell, FileText, PieChart, Globe, Scale, Siren, UserCircle,
 } from 'lucide-react';
 
 const navItems = [
@@ -23,10 +25,22 @@ const navItems = [
   { to: '/subscriptions',         icon: Repeat,          label: 'SUBSCRIPTIONS' },
   { to: '/plaid',                 icon: CreditCard,      label: 'PLAID' },
   { to: '/ai-intelligence',         icon: Brain,           label: 'AI INTEL' },
+  { to: '/email-intel',            icon: Mail,            label: 'EMAIL INTEL' },
   { to: '/enterprise',             icon: DollarSign,      label: 'ENTERPRISE' },
   { to: '/partner-portal',         icon: Building2,       label: 'PARTNER' },
   { to: '/pricing',               icon: Sparkles,        label: 'UPGRADE' },
+  { to: '/account',               icon: UserCircle,      label: 'ACCOUNT' },
   { to: '/settings',              icon: Settings,        label: 'SETTINGS' },
+];
+
+const addonItems = [
+  { to: '/smart-reminder',  icon: Bell,      label: 'SMART REMINDER' },
+  { to: '/auto-draft',      icon: FileText,  label: 'AUTO DRAFT' },
+  { to: '/spend-analyzer',  icon: PieChart,  label: 'SPEND ANALYZER' },
+  { to: '/contract-watch',  icon: FileSearch, label: 'CONTRACT WATCH' },
+  { to: '/currency-guard',  icon: Globe,     label: 'CURRENCY GUARD' },
+  { to: '/tax-normalizer',  icon: Scale,     label: 'TAX NORMALIZER' },
+  { to: '/escalate-ai',     icon: Siren,     label: 'ESCALATE AI' },
 ];
 
 interface SidebarProps {
@@ -35,10 +49,10 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
-  const { user, logout } = useAuthStore();
-  const navigate = useNavigate();
+  const { user } = useAuthStore();
+  const { signOut } = useAuth();
 
-  const handleLogout = () => { logout(); navigate('/login'); };
+  const handleLogout = () => signOut();
 
   return (
     <aside style={{
@@ -94,6 +108,29 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
               borderLeft: isActive ? '2px solid #f59e0b' : '2px solid transparent',
             })}>
             <Icon size={14} style={{ flexShrink: 0 }} />
+            {!collapsed && <span>{label}</span>}
+          </NavLink>
+        ))}
+
+        {/* Add-On Services section */}
+        <div style={{ height: 1, background: 'rgba(255,255,255,0.08)', margin: '8px 4px' }} />
+        {!collapsed && (
+          <div style={{ padding: '4px 10px 6px', fontSize: 9, color: '#f59e0b', letterSpacing: '2px', fontWeight: 700 }}>ADD-ONS</div>
+        )}
+        {addonItems.map(({ to, icon: Icon, label }) => (
+          <NavLink key={to} to={to} title={collapsed ? label : undefined}
+            style={({ isActive }) => ({
+              display: 'flex', alignItems: 'center', gap: collapsed ? 0 : 9,
+              justifyContent: collapsed ? 'center' : 'flex-start',
+              padding: collapsed ? '8px' : '7px 10px',
+              borderRadius: 'var(--radius)',
+              color: isActive ? '#ffffff' : 'var(--text-sidebar)',
+              background: isActive ? 'rgba(245,158,11,0.12)' : 'transparent',
+              fontSize: '10px', letterSpacing: '1px', fontWeight: isActive ? 700 : 400,
+              textDecoration: 'none', transition: 'all 0.15s',
+              borderLeft: isActive ? '2px solid #f59e0b' : '2px solid transparent',
+            })}>
+            <Icon size={13} style={{ flexShrink: 0 }} />
             {!collapsed && <span>{label}</span>}
           </NavLink>
         ))}

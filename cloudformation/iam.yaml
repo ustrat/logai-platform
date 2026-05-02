@@ -1,0 +1,372 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: ValuePilot — Least-privilege IAM roles per service (API, Lambda, Bedrock)
+
+Parameters:
+  Environment:
+    Type: String
+    Default: production
+    AllowedValues: [development, staging, production]
+
+Resources:
+
+  # ── Shared policy: invoke Claude models via Bedrock ──────────────────────
+  # Same model access for all roles — Bedrock does not support resource-level
+  # restrictions per IAM principal within a single account.
+  BedrockInvokePolicy:
+    Type: AWS::IAM::ManagedPolicy
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      ManagedPolicyName: !Sub valuepilot-bedrock-invoke-${Environment}
+      Description: Allows ValuePilot services to invoke Claude models via Amazon Bedrock
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: BedrockInvokeModels
+            Effect: Allow
+            Action:
+              - bedrock:InvokeModel
+              - bedrock:InvokeModelWithResponseStream
+              - bedrock:Converse
+              - bedrock:ConverseStream
+            Resource:
+              - !Sub "arn:aws:bedrock:${AWS::Region}::foundation-model/anthropic.claude-sonnet-4-6"
+              - !Sub "arn:aws:bedrock:${AWS::Region}::foundation-model/anthropic.claude-haiku-4-5-20251001"
+              - !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/us.anthropic.claude-sonnet-4-6"
+              - !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/us.anthropic.claude-haiku-4-5-20251001"
+
+  # ── Role: Renewal Alerts Lambda functions (7 Python functions) ────────────
+  # Access: read subscription/user/stripe data → write alerts log
+  AlertsLambdaRole:
+    Type: AWS::IAM::Role
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      RoleName: !Sub valuepilot-alerts-lambda-role-${Environment}
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - !Ref BedrockInvokePolicy
+      Policies:
+        - PolicyName: !Sub alerts-lambda-dynamodb-${Environment}
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              # Read-only: source tables used to detect renewal risk
+              - Sid: DynamoReadSourceTables
+                Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:Query
+                Resource:
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/vp-users-log-${Environment}"
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/vp-users-log-${Environment}/index/*"
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/vp-subscriptions-log-${Environment}"
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/vp-subscriptions-log-${Environment}/index/*"
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/vp-stripe-log-${Environment}"
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/vp-stripe-log-${Environment}/index/*"
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/vp-transactions-log-${Environment}"
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/vp-transactions-log-${Environment}/index/*"
+              # Write: alert events written here
+              - Sid: DynamoWriteAlertsLog
+                Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:GetItem
+                  - dynamodb:Query
+                Resource:
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/vp-alerts-log-${Environment}"
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/vp-alerts-log-${Environment}/index/*"
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/vp-signals-log-${Environment}"
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/vp-signals-log-${Environment}/index/*"
+              # KMS: decrypt data from CMK-encrypted tables
+              - Sid: DynamoKmsAccess
+                Effect: Allow
+                Action:
+                  - kms:Decrypt
+                  - kms:GenerateDataKey
+                  - kms:DescribeKey
+                Resource:
+                  Fn::ImportValue:
+                    Fn::Sub: "valuepilot-${Environment}-dynamodb-cmk-arn"
+        - PolicyName: !Sub alerts-lambda-messaging-${Environment}
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: PublishToAlertsTopic
+                Effect: Allow
+                Action: sns:Publish
+                Resource:
+                  Fn::ImportValue:
+                    Fn::Sub: "valuepilot-${Environment}-alerts-topic-arn"
+              - Sid: SendToDLQ
+                Effect: Allow
+                Action: sqs:SendMessage
+                Resource:
+                  Fn::ImportValue:
+                    Fn::Sub: "valuepilot-${Environment}-alerts-dlq-arn"
+              # cloudwatch:PutMetricData has no resource-level support; restrict by namespace condition
+              - Sid: PutMetricsValuePilotNamespace
+                Effect: Allow
+                Action: cloudwatch:PutMetricData
+                Resource: "*"
+                Condition:
+                  StringEquals:
+                    cloudwatch:namespace: ValuePilot
+      Tags:
+        - Key: Project
+          Value: ValuePilot
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  # ── Role: Email Intelligence Lambda (Node.js SAM stack) ──────────────────
+  # Access: email-intel log only + S3 bucket + OAuth SSM params
+  EmailIntelLambdaRole:
+    Type: AWS::IAM::Role
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      RoleName: !Sub valuepilot-email-intel-role-${Environment}
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - !Ref BedrockInvokePolicy
+      Policies:
+        - PolicyName: !Sub email-intel-dynamodb-${Environment}
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: DynamoEmailIntelLog
+                Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:GetItem
+                  - dynamodb:Query
+                  - dynamodb:BatchWriteItem
+                Resource:
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/vp-email-intel-log-${Environment}"
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/vp-email-intel-log-${Environment}/index/*"
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/vp-signals-log-${Environment}"
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/vp-signals-log-${Environment}/index/*"
+              - Sid: DynamoKmsAccess
+                Effect: Allow
+                Action:
+                  - kms:Decrypt
+                  - kms:GenerateDataKey
+                  - kms:DescribeKey
+                Resource:
+                  Fn::ImportValue:
+                    Fn::Sub: "valuepilot-${Environment}-dynamodb-cmk-arn"
+        - PolicyName: !Sub email-intel-s3-${Environment}
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: S3EmailIntelBucket
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:DeleteObject
+                Resource: !Sub
+                  - "${BucketArn}/*"
+                  - BucketArn:
+                      Fn::ImportValue:
+                        Fn::Sub: "valuepilot-${Environment}-email-intel-bucket-arn"
+              - Sid: S3EmailIntelList
+                Effect: Allow
+                Action: s3:ListBucket
+                Resource:
+                  Fn::ImportValue:
+                    Fn::Sub: "valuepilot-${Environment}-email-intel-bucket-arn"
+              # KMS for S3 SSE-KMS objects
+              - Sid: S3KmsAccess
+                Effect: Allow
+                Action:
+                  - kms:Decrypt
+                  - kms:GenerateDataKey
+                  - kms:DescribeKey
+                Resource:
+                  Fn::ImportValue:
+                    Fn::Sub: "valuepilot-${Environment}-s3-cmk-arn"
+        - PolicyName: !Sub email-intel-messaging-${Environment}
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: PublishScanSummaries
+                Effect: Allow
+                Action: sns:Publish
+                Resource:
+                  Fn::ImportValue:
+                    Fn::Sub: "valuepilot-${Environment}-email-intel-summaries-topic-arn"
+              - Sid: ReadOAuthSSMParams
+                Effect: Allow
+                Action: ssm:GetParameter
+                Resource: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/valuepilot/email-intel/*"
+              - Sid: SendToDLQ
+                Effect: Allow
+                Action: sqs:SendMessage
+                Resource:
+                  Fn::ImportValue:
+                    Fn::Sub: "valuepilot-${Environment}-email-intel-dlq-arn"
+              - Sid: PutMetricsValuePilotNamespace
+                Effect: Allow
+                Action: cloudwatch:PutMetricData
+                Resource: "*"
+                Condition:
+                  StringEquals:
+                    cloudwatch:namespace: ValuePilot
+      Tags:
+        - Key: Project
+          Value: ValuePilot
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  # ── Role: API backend (ECS task / App Runner) ─────────────────────────────
+  # Access: all DynamoDB log tables (API is the primary write path for events)
+  # + SSM params + Secrets Manager for runtime config
+  ApiTaskRole:
+    Type: AWS::IAM::Role
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      RoleName: !Sub valuepilot-api-task-role-${Environment}
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ecs-tasks.amazonaws.com
+                - tasks.apprunner.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Ref BedrockInvokePolicy
+      Policies:
+        - PolicyName: !Sub api-task-dynamodb-${Environment}
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              # The API is the primary event-logging path — needs all 18 log tables
+              - Sid: DynamoAllLogTables
+                Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:GetItem
+                  - dynamodb:Query
+                  - dynamodb:BatchWriteItem
+                Resource:
+                  # Core domain tables
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/vp-users-log-${Environment}"
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/vp-users-log-${Environment}/index/*"
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/vp-transactions-log-${Environment}"
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/vp-transactions-log-${Environment}/index/*"
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/vp-subscriptions-log-${Environment}"
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/vp-subscriptions-log-${Environment}/index/*"
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/vp-plaid-log-${Environment}"
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/vp-plaid-log-${Environment}/index/*"
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/vp-stripe-log-${Environment}"
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/vp-stripe-log-${Environment}/index/*"
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/vp-enterprise-log-${Environment}"
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/vp-enterprise-log-${Environment}/index/*"
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/vp-partner-log-${Environment}"
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/vp-partner-log-${Environment}/index/*"
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/vp-email-intel-log-${Environment}"
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/vp-email-intel-log-${Environment}/index/*"
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/vp-signals-log-${Environment}"
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/vp-signals-log-${Environment}/index/*"
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/vp-alerts-log-${Environment}"
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/vp-alerts-log-${Environment}/index/*"
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/vp-ml-inference-log-${Environment}"
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/vp-ml-inference-log-${Environment}/index/*"
+                  # Add-on service tables
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/vp-reminders-log-${Environment}"
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/vp-reminders-log-${Environment}/index/*"
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/vp-drafts-log-${Environment}"
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/vp-drafts-log-${Environment}/index/*"
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/vp-spend-log-${Environment}"
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/vp-spend-log-${Environment}/index/*"
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/vp-contracts-log-${Environment}"
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/vp-contracts-log-${Environment}/index/*"
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/vp-currency-log-${Environment}"
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/vp-currency-log-${Environment}/index/*"
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/vp-tax-log-${Environment}"
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/vp-tax-log-${Environment}/index/*"
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/vp-escalations-log-${Environment}"
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/vp-escalations-log-${Environment}/index/*"
+              - Sid: DynamoKmsAccess
+                Effect: Allow
+                Action:
+                  - kms:Decrypt
+                  - kms:GenerateDataKey
+                  - kms:DescribeKey
+                Resource:
+                  Fn::ImportValue:
+                    Fn::Sub: "valuepilot-${Environment}-dynamodb-cmk-arn"
+        - PolicyName: !Sub api-task-config-${Environment}
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: ReadSSMParams
+                Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                  - ssm:GetParameters
+                  - ssm:GetParametersByPath
+                Resource: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/valuepilot/*"
+              - Sid: ReadAppSecrets
+                Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                  - secretsmanager:DescribeSecret
+                Resource: !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:valuepilot/*"
+              - Sid: PutMetricsValuePilotNamespace
+                Effect: Allow
+                Action: cloudwatch:PutMetricData
+                Resource: "*"
+                Condition:
+                  StringEquals:
+                    cloudwatch:namespace: ValuePilot
+      Tags:
+        - Key: Project
+          Value: ValuePilot
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: CloudFormation
+
+Outputs:
+  AlertsLambdaRoleArn:
+    Value: !GetAtt AlertsLambdaRole.Arn
+    Export:
+      Name: !Sub "valuepilot-${Environment}-alerts-lambda-role-arn"
+  EmailIntelLambdaRoleArn:
+    Value: !GetAtt EmailIntelLambdaRole.Arn
+    Export:
+      Name: !Sub "valuepilot-${Environment}-email-intel-lambda-role-arn"
+  ApiTaskRoleArn:
+    Value: !GetAtt ApiTaskRole.Arn
+    Export:
+      Name: !Sub "valuepilot-${Environment}-api-task-role-arn"
+  BedrockInvokePolicyArn:
+    Value: !Ref BedrockInvokePolicy
+    Export:
+      Name: !Sub "valuepilot-${Environment}-bedrock-invoke-policy-arn"

@@ -1,0 +1,1332 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: ValuePilot — DynamoDB log tables (18 tables, all domains)
+
+Parameters:
+  Environment:
+    Type: String
+    Default: production
+    AllowedValues: [development, staging, production]
+
+Resources:
+
+  # ── Table 1: vp-users-log ────────────────────────────────────────────────────
+  UsersLogTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub vp-users-log-${Environment}
+      BillingMode: PAY_PER_REQUEST
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+        - AttributeName: email
+          AttributeType: S
+        - AttributeName: eventType
+          AttributeType: S
+        - AttributeName: timestamp_ms
+          AttributeType: N
+      GlobalSecondaryIndexes:
+        - IndexName: GSI1-email-time
+          KeySchema:
+            - AttributeName: email
+              KeyType: HASH
+            - AttributeName: timestamp_ms
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: GSI2-eventType-time
+          KeySchema:
+            - AttributeName: eventType
+              KeyType: HASH
+            - AttributeName: timestamp_ms
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+        SSEType: KMS
+        KMSMasterKeyId:
+          Fn::ImportValue:
+            Fn::Sub: "valuepilot-${Environment}-dynamodb-cmk-arn"
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+      Tags:
+        - Key: Project
+          Value: ValuePilot
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  # ── Table 2: vp-transactions-log ─────────────────────────────────────────────
+  TransactionsLogTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub vp-transactions-log-${Environment}
+      BillingMode: PAY_PER_REQUEST
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+        - AttributeName: transactionId
+          AttributeType: S
+        - AttributeName: status
+          AttributeType: S
+        - AttributeName: userId
+          AttributeType: S
+        - AttributeName: timestamp_ms
+          AttributeType: N
+      GlobalSecondaryIndexes:
+        - IndexName: GSI1-txnId
+          KeySchema:
+            - AttributeName: transactionId
+              KeyType: HASH
+            - AttributeName: timestamp_ms
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: GSI2-status-time
+          KeySchema:
+            - AttributeName: status
+              KeyType: HASH
+            - AttributeName: timestamp_ms
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: GSI3-userId-time
+          KeySchema:
+            - AttributeName: userId
+              KeyType: HASH
+            - AttributeName: timestamp_ms
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+        SSEType: KMS
+        KMSMasterKeyId:
+          Fn::ImportValue:
+            Fn::Sub: "valuepilot-${Environment}-dynamodb-cmk-arn"
+      StreamSpecification:
+        StreamViewType: NEW_IMAGE
+      Tags:
+        - Key: Project
+          Value: ValuePilot
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  # ── Table 3: vp-subscriptions-log ────────────────────────────────────────────
+  SubscriptionsLogTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub vp-subscriptions-log-${Environment}
+      BillingMode: PAY_PER_REQUEST
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+        - AttributeName: merchant
+          AttributeType: S
+        - AttributeName: status
+          AttributeType: S
+        - AttributeName: subscriptionId
+          AttributeType: S
+        - AttributeName: timestamp_ms
+          AttributeType: N
+      GlobalSecondaryIndexes:
+        - IndexName: GSI1-merchant-time
+          KeySchema:
+            - AttributeName: merchant
+              KeyType: HASH
+            - AttributeName: timestamp_ms
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: GSI2-status-time
+          KeySchema:
+            - AttributeName: status
+              KeyType: HASH
+            - AttributeName: timestamp_ms
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: GSI3-subId
+          KeySchema:
+            - AttributeName: subscriptionId
+              KeyType: HASH
+            - AttributeName: timestamp_ms
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+        SSEType: KMS
+        KMSMasterKeyId:
+          Fn::ImportValue:
+            Fn::Sub: "valuepilot-${Environment}-dynamodb-cmk-arn"
+      StreamSpecification:
+        StreamViewType: NEW_IMAGE
+      Tags:
+        - Key: Project
+          Value: ValuePilot
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  # ── Table 4: vp-plaid-log ─────────────────────────────────────────────────────
+  PlaidLogTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub vp-plaid-log-${Environment}
+      BillingMode: PAY_PER_REQUEST
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+        - AttributeName: itemId
+          AttributeType: S
+        - AttributeName: timestamp_ms
+          AttributeType: N
+      GlobalSecondaryIndexes:
+        - IndexName: GSI1-itemId
+          KeySchema:
+            - AttributeName: itemId
+              KeyType: HASH
+            - AttributeName: timestamp_ms
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+        SSEType: KMS
+        KMSMasterKeyId:
+          Fn::ImportValue:
+            Fn::Sub: "valuepilot-${Environment}-dynamodb-cmk-arn"
+      StreamSpecification:
+        StreamViewType: NEW_IMAGE
+      Tags:
+        - Key: Project
+          Value: ValuePilot
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  # ── Table 5: vp-stripe-log ────────────────────────────────────────────────────
+  StripeLogTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub vp-stripe-log-${Environment}
+      BillingMode: PAY_PER_REQUEST
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+        - AttributeName: stripeSubscriptionId
+          AttributeType: S
+        - AttributeName: eventType
+          AttributeType: S
+        - AttributeName: stripeEventId
+          AttributeType: S
+        - AttributeName: timestamp_ms
+          AttributeType: N
+      GlobalSecondaryIndexes:
+        - IndexName: GSI1-stripeSubId-time
+          KeySchema:
+            - AttributeName: stripeSubscriptionId
+              KeyType: HASH
+            - AttributeName: timestamp_ms
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: GSI2-eventType-time
+          KeySchema:
+            - AttributeName: eventType
+              KeyType: HASH
+            - AttributeName: timestamp_ms
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: GSI3-stripeEventId
+          KeySchema:
+            - AttributeName: stripeEventId
+              KeyType: HASH
+          Projection:
+            ProjectionType: KEYS_ONLY
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+        SSEType: KMS
+        KMSMasterKeyId:
+          Fn::ImportValue:
+            Fn::Sub: "valuepilot-${Environment}-dynamodb-cmk-arn"
+      StreamSpecification:
+        StreamViewType: NEW_IMAGE
+      Tags:
+        - Key: Project
+          Value: ValuePilot
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  # ── Table 6: vp-enterprise-log ────────────────────────────────────────────────
+  EnterpriseLogTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub vp-enterprise-log-${Environment}
+      BillingMode: PAY_PER_REQUEST
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+        - AttributeName: orderId
+          AttributeType: S
+        - AttributeName: salesPersonId
+          AttributeType: S
+        - AttributeName: status
+          AttributeType: S
+        - AttributeName: invoiceId
+          AttributeType: S
+        - AttributeName: timestamp_ms
+          AttributeType: N
+      GlobalSecondaryIndexes:
+        - IndexName: GSI1-orderId-time
+          KeySchema:
+            - AttributeName: orderId
+              KeyType: HASH
+            - AttributeName: timestamp_ms
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: GSI2-salesPerson-time
+          KeySchema:
+            - AttributeName: salesPersonId
+              KeyType: HASH
+            - AttributeName: timestamp_ms
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: GSI3-status-time
+          KeySchema:
+            - AttributeName: status
+              KeyType: HASH
+            - AttributeName: timestamp_ms
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: GSI4-invoiceId
+          KeySchema:
+            - AttributeName: invoiceId
+              KeyType: HASH
+            - AttributeName: timestamp_ms
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+        SSEType: KMS
+        KMSMasterKeyId:
+          Fn::ImportValue:
+            Fn::Sub: "valuepilot-${Environment}-dynamodb-cmk-arn"
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+      Tags:
+        - Key: Project
+          Value: ValuePilot
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  # ── Table 7: vp-partner-log ───────────────────────────────────────────────────
+  PartnerLogTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub vp-partner-log-${Environment}
+      BillingMode: PAY_PER_REQUEST
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+        - AttributeName: memberId
+          AttributeType: S
+        - AttributeName: actorEmail
+          AttributeType: S
+        - AttributeName: memberEmail
+          AttributeType: S
+        - AttributeName: timestamp_ms
+          AttributeType: N
+      GlobalSecondaryIndexes:
+        - IndexName: GSI1-memberId-time
+          KeySchema:
+            - AttributeName: memberId
+              KeyType: HASH
+            - AttributeName: timestamp_ms
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: GSI2-actorEmail-time
+          KeySchema:
+            - AttributeName: actorEmail
+              KeyType: HASH
+            - AttributeName: timestamp_ms
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: GSI3-email-time
+          KeySchema:
+            - AttributeName: memberEmail
+              KeyType: HASH
+            - AttributeName: timestamp_ms
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+        SSEType: KMS
+        KMSMasterKeyId:
+          Fn::ImportValue:
+            Fn::Sub: "valuepilot-${Environment}-dynamodb-cmk-arn"
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+      Tags:
+        - Key: Project
+          Value: ValuePilot
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  # ── Table 8: vp-email-intel-log ───────────────────────────────────────────────
+  EmailIntelLogTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub vp-email-intel-log-${Environment}
+      BillingMode: PAY_PER_REQUEST
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+        - AttributeName: provider
+          AttributeType: S
+        - AttributeName: connectedEmail
+          AttributeType: S
+        - AttributeName: status
+          AttributeType: S
+        - AttributeName: timestamp_ms
+          AttributeType: N
+      GlobalSecondaryIndexes:
+        - IndexName: GSI1-provider-time
+          KeySchema:
+            - AttributeName: provider
+              KeyType: HASH
+            - AttributeName: timestamp_ms
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: GSI2-email-time
+          KeySchema:
+            - AttributeName: connectedEmail
+              KeyType: HASH
+            - AttributeName: timestamp_ms
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: GSI3-status-time
+          KeySchema:
+            - AttributeName: status
+              KeyType: HASH
+            - AttributeName: timestamp_ms
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+        SSEType: KMS
+        KMSMasterKeyId:
+          Fn::ImportValue:
+            Fn::Sub: "valuepilot-${Environment}-dynamodb-cmk-arn"
+      StreamSpecification:
+        StreamViewType: NEW_IMAGE
+      Tags:
+        - Key: Project
+          Value: ValuePilot
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  # ── Table 9: vp-signals-log ───────────────────────────────────────────────────
+  SignalsLogTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub vp-signals-log-${Environment}
+      BillingMode: PAY_PER_REQUEST
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+        - AttributeName: productKey
+          AttributeType: S
+        - AttributeName: urgency
+          AttributeType: S
+        - AttributeName: runId
+          AttributeType: S
+        - AttributeName: userId
+          AttributeType: S
+        - AttributeName: timestamp_ms
+          AttributeType: N
+      GlobalSecondaryIndexes:
+        - IndexName: GSI1-productKey-urgency
+          KeySchema:
+            - AttributeName: productKey
+              KeyType: HASH
+            - AttributeName: urgency
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: GSI2-runId-product
+          KeySchema:
+            - AttributeName: runId
+              KeyType: HASH
+            - AttributeName: productKey
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: GSI3-userId-product
+          KeySchema:
+            - AttributeName: userId
+              KeyType: HASH
+            - AttributeName: productKey
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: GSI4-productKey-time
+          KeySchema:
+            - AttributeName: productKey
+              KeyType: HASH
+            - AttributeName: timestamp_ms
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+        SSEType: KMS
+        KMSMasterKeyId:
+          Fn::ImportValue:
+            Fn::Sub: "valuepilot-${Environment}-dynamodb-cmk-arn"
+      StreamSpecification:
+        StreamViewType: NEW_IMAGE
+      Tags:
+        - Key: Project
+          Value: ValuePilot
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  # ── Table 10: vp-alerts-log ───────────────────────────────────────────────────
+  AlertsLogTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub vp-alerts-log-${Environment}
+      BillingMode: PAY_PER_REQUEST
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+        - AttributeName: alertType
+          AttributeType: S
+        - AttributeName: subscriptionId
+          AttributeType: S
+        - AttributeName: severity
+          AttributeType: S
+        - AttributeName: functionName
+          AttributeType: S
+        - AttributeName: timestamp_ms
+          AttributeType: N
+      GlobalSecondaryIndexes:
+        - IndexName: GSI1-alertType-time
+          KeySchema:
+            - AttributeName: alertType
+              KeyType: HASH
+            - AttributeName: timestamp_ms
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: GSI2-subId-time
+          KeySchema:
+            - AttributeName: subscriptionId
+              KeyType: HASH
+            - AttributeName: timestamp_ms
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: GSI3-severity-time
+          KeySchema:
+            - AttributeName: severity
+              KeyType: HASH
+            - AttributeName: timestamp_ms
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: GSI4-functionName-time
+          KeySchema:
+            - AttributeName: functionName
+              KeyType: HASH
+            - AttributeName: timestamp_ms
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+        SSEType: KMS
+        KMSMasterKeyId:
+          Fn::ImportValue:
+            Fn::Sub: "valuepilot-${Environment}-dynamodb-cmk-arn"
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+      Tags:
+        - Key: Project
+          Value: ValuePilot
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  # ── Table 11: vp-ml-inference-log ─────────────────────────────────────────────
+  MlInferenceLogTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub vp-ml-inference-log-${Environment}
+      BillingMode: PAY_PER_REQUEST
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+        - AttributeName: userId
+          AttributeType: S
+        - AttributeName: topSeverity
+          AttributeType: S
+        - AttributeName: inferenceId
+          AttributeType: S
+        - AttributeName: modelVersion
+          AttributeType: S
+        - AttributeName: timestamp_ms
+          AttributeType: N
+      GlobalSecondaryIndexes:
+        - IndexName: GSI1-userId-time
+          KeySchema:
+            - AttributeName: userId
+              KeyType: HASH
+            - AttributeName: timestamp_ms
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: GSI2-severity-time
+          KeySchema:
+            - AttributeName: topSeverity
+              KeyType: HASH
+            - AttributeName: timestamp_ms
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: GSI3-inferenceId
+          KeySchema:
+            - AttributeName: inferenceId
+              KeyType: HASH
+          Projection:
+            ProjectionType: KEYS_ONLY
+        - IndexName: GSI4-modelVersion-time
+          KeySchema:
+            - AttributeName: modelVersion
+              KeyType: HASH
+            - AttributeName: timestamp_ms
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+        SSEType: KMS
+        KMSMasterKeyId:
+          Fn::ImportValue:
+            Fn::Sub: "valuepilot-${Environment}-dynamodb-cmk-arn"
+      StreamSpecification:
+        StreamViewType: NEW_IMAGE
+      Tags:
+        - Key: Project
+          Value: ValuePilot
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  # ── Table 12: vp-reminders-log (SmartReminder) ───────────────────────────────
+  RemindersLogTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub vp-reminders-log-${Environment}
+      BillingMode: PAY_PER_REQUEST
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+        - AttributeName: status
+          AttributeType: S
+        - AttributeName: priority
+          AttributeType: S
+        - AttributeName: timestamp_ms
+          AttributeType: N
+      GlobalSecondaryIndexes:
+        - IndexName: GSI1-status-time
+          KeySchema:
+            - AttributeName: status
+              KeyType: HASH
+            - AttributeName: timestamp_ms
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: GSI2-priority-time
+          KeySchema:
+            - AttributeName: priority
+              KeyType: HASH
+            - AttributeName: timestamp_ms
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+        SSEType: KMS
+        KMSMasterKeyId:
+          Fn::ImportValue:
+            Fn::Sub: "valuepilot-${Environment}-dynamodb-cmk-arn"
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+      Tags:
+        - Key: Project
+          Value: ValuePilot
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  # ── Table 13: vp-drafts-log (AutoDraft) ──────────────────────────────────────
+  DraftsLogTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub vp-drafts-log-${Environment}
+      BillingMode: PAY_PER_REQUEST
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+        - AttributeName: draftType
+          AttributeType: S
+        - AttributeName: timestamp_ms
+          AttributeType: N
+      GlobalSecondaryIndexes:
+        - IndexName: GSI1-draftType-time
+          KeySchema:
+            - AttributeName: draftType
+              KeyType: HASH
+            - AttributeName: timestamp_ms
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+        SSEType: KMS
+        KMSMasterKeyId:
+          Fn::ImportValue:
+            Fn::Sub: "valuepilot-${Environment}-dynamodb-cmk-arn"
+      StreamSpecification:
+        StreamViewType: NEW_IMAGE
+      Tags:
+        - Key: Project
+          Value: ValuePilot
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  # ── Table 14: vp-spend-log (SpendAnalyzer) ───────────────────────────────────
+  SpendLogTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub vp-spend-log-${Environment}
+      BillingMode: PAY_PER_REQUEST
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+        - AttributeName: category
+          AttributeType: S
+        - AttributeName: vendor
+          AttributeType: S
+        - AttributeName: timestamp_ms
+          AttributeType: N
+      GlobalSecondaryIndexes:
+        - IndexName: GSI1-category-time
+          KeySchema:
+            - AttributeName: category
+              KeyType: HASH
+            - AttributeName: timestamp_ms
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: GSI2-vendor-time
+          KeySchema:
+            - AttributeName: vendor
+              KeyType: HASH
+            - AttributeName: timestamp_ms
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+        SSEType: KMS
+        KMSMasterKeyId:
+          Fn::ImportValue:
+            Fn::Sub: "valuepilot-${Environment}-dynamodb-cmk-arn"
+      StreamSpecification:
+        StreamViewType: NEW_IMAGE
+      Tags:
+        - Key: Project
+          Value: ValuePilot
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  # ── Table 15: vp-contracts-log (ContractWatch) ───────────────────────────────
+  ContractsLogTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub vp-contracts-log-${Environment}
+      BillingMode: PAY_PER_REQUEST
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+        - AttributeName: riskLevel
+          AttributeType: S
+        - AttributeName: status
+          AttributeType: S
+        - AttributeName: vendor
+          AttributeType: S
+        - AttributeName: timestamp_ms
+          AttributeType: N
+      GlobalSecondaryIndexes:
+        - IndexName: GSI1-riskLevel-time
+          KeySchema:
+            - AttributeName: riskLevel
+              KeyType: HASH
+            - AttributeName: timestamp_ms
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: GSI2-status-time
+          KeySchema:
+            - AttributeName: status
+              KeyType: HASH
+            - AttributeName: timestamp_ms
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: GSI3-vendor-time
+          KeySchema:
+            - AttributeName: vendor
+              KeyType: HASH
+            - AttributeName: timestamp_ms
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+        SSEType: KMS
+        KMSMasterKeyId:
+          Fn::ImportValue:
+            Fn::Sub: "valuepilot-${Environment}-dynamodb-cmk-arn"
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+      Tags:
+        - Key: Project
+          Value: ValuePilot
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  # ── Table 16: vp-currency-log (CurrencyGuard) ────────────────────────────────
+  CurrencyLogTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub vp-currency-log-${Environment}
+      BillingMode: PAY_PER_REQUEST
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+        - AttributeName: currencyPair
+          AttributeType: S
+        - AttributeName: severity
+          AttributeType: S
+        - AttributeName: timestamp_ms
+          AttributeType: N
+      GlobalSecondaryIndexes:
+        - IndexName: GSI1-currencyPair-time
+          KeySchema:
+            - AttributeName: currencyPair
+              KeyType: HASH
+            - AttributeName: timestamp_ms
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: GSI2-severity-time
+          KeySchema:
+            - AttributeName: severity
+              KeyType: HASH
+            - AttributeName: timestamp_ms
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+        SSEType: KMS
+        KMSMasterKeyId:
+          Fn::ImportValue:
+            Fn::Sub: "valuepilot-${Environment}-dynamodb-cmk-arn"
+      StreamSpecification:
+        StreamViewType: NEW_IMAGE
+      Tags:
+        - Key: Project
+          Value: ValuePilot
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  # ── Table 17: vp-tax-log (TaxNormalizer) ─────────────────────────────────────
+  TaxLogTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub vp-tax-log-${Environment}
+      BillingMode: PAY_PER_REQUEST
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+        - AttributeName: jurisdiction
+          AttributeType: S
+        - AttributeName: classification
+          AttributeType: S
+        - AttributeName: timestamp_ms
+          AttributeType: N
+      GlobalSecondaryIndexes:
+        - IndexName: GSI1-jurisdiction-time
+          KeySchema:
+            - AttributeName: jurisdiction
+              KeyType: HASH
+            - AttributeName: timestamp_ms
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: GSI2-classification-time
+          KeySchema:
+            - AttributeName: classification
+              KeyType: HASH
+            - AttributeName: timestamp_ms
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+        SSEType: KMS
+        KMSMasterKeyId:
+          Fn::ImportValue:
+            Fn::Sub: "valuepilot-${Environment}-dynamodb-cmk-arn"
+      StreamSpecification:
+        StreamViewType: NEW_IMAGE
+      Tags:
+        - Key: Project
+          Value: ValuePilot
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  # ── Table 18: vp-escalations-log (EscalateAI) ────────────────────────────────
+  EscalationsLogTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub vp-escalations-log-${Environment}
+      BillingMode: PAY_PER_REQUEST
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+        - AttributeName: status
+          AttributeType: S
+        - AttributeName: escalationType
+          AttributeType: S
+        - AttributeName: triggeredBy
+          AttributeType: S
+        - AttributeName: timestamp_ms
+          AttributeType: N
+      GlobalSecondaryIndexes:
+        - IndexName: GSI1-status-time
+          KeySchema:
+            - AttributeName: status
+              KeyType: HASH
+            - AttributeName: timestamp_ms
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: GSI2-escalationType-time
+          KeySchema:
+            - AttributeName: escalationType
+              KeyType: HASH
+            - AttributeName: timestamp_ms
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: GSI3-triggeredBy-time
+          KeySchema:
+            - AttributeName: triggeredBy
+              KeyType: HASH
+            - AttributeName: timestamp_ms
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+        SSEType: KMS
+        KMSMasterKeyId:
+          Fn::ImportValue:
+            Fn::Sub: "valuepilot-${Environment}-dynamodb-cmk-arn"
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+      Tags:
+        - Key: Project
+          Value: ValuePilot
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  # ── Table 19: vp-user-profiles (profile & notification prefs) ───────────────
+  UserProfilesTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub vp-user-profiles-${Environment}
+      BillingMode: PAY_PER_REQUEST
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+        SSEType: KMS
+        KMSMasterKeyId:
+          Fn::ImportValue:
+            Fn::Sub: "valuepilot-${Environment}-dynamodb-cmk-arn"
+      Tags:
+        - Key: Project
+          Value: ValuePilot
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: CloudFormation
+
+Outputs:
+  UsersLogTableName:
+    Value: !Ref UsersLogTable
+    Export:
+      Name: !Sub "valuepilot-${Environment}-users-log-table-name"
+  TransactionsLogTableName:
+    Value: !Ref TransactionsLogTable
+    Export:
+      Name: !Sub "valuepilot-${Environment}-transactions-log-table-name"
+  SubscriptionsLogTableName:
+    Value: !Ref SubscriptionsLogTable
+    Export:
+      Name: !Sub "valuepilot-${Environment}-subscriptions-log-table-name"
+  PlaidLogTableName:
+    Value: !Ref PlaidLogTable
+    Export:
+      Name: !Sub "valuepilot-${Environment}-plaid-log-table-name"
+  StripeLogTableName:
+    Value: !Ref StripeLogTable
+    Export:
+      Name: !Sub "valuepilot-${Environment}-stripe-log-table-name"
+  EnterpriseLogTableName:
+    Value: !Ref EnterpriseLogTable
+    Export:
+      Name: !Sub "valuepilot-${Environment}-enterprise-log-table-name"
+  PartnerLogTableName:
+    Value: !Ref PartnerLogTable
+    Export:
+      Name: !Sub "valuepilot-${Environment}-partner-log-table-name"
+  EmailIntelLogTableName:
+    Value: !Ref EmailIntelLogTable
+    Export:
+      Name: !Sub "valuepilot-${Environment}-email-intel-log-table-name"
+  SignalsLogTableName:
+    Value: !Ref SignalsLogTable
+    Export:
+      Name: !Sub "valuepilot-${Environment}-signals-log-table-name"
+  AlertsLogTableName:
+    Value: !Ref AlertsLogTable
+    Export:
+      Name: !Sub "valuepilot-${Environment}-alerts-log-table-name"
+  MlInferenceLogTableName:
+    Value: !Ref MlInferenceLogTable
+    Export:
+      Name: !Sub "valuepilot-${Environment}-ml-inference-log-table-name"

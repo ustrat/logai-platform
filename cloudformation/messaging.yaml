@@ -1,0 +1,204 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: ValuePilot — SNS topics and SQS dead-letter queues
+
+Parameters:
+  Environment:
+    Type: String
+    Default: production
+    AllowedValues: [development, staging, production]
+  AlertEmail:
+    Type: String
+    Default: camir.inshiqaq@icpsystems.com
+    Description: Email address for operational alert notifications
+
+Conditions:
+  HasAlertEmail: !Not [!Equals [!Ref AlertEmail, ""]]
+
+Resources:
+
+  # ── SNS: Renewal alerts ───────────────────────────────────────────────────────
+  AlertsTopic:
+    Type: AWS::SNS::Topic
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TopicName: !Sub valuepilot-alerts-${Environment}
+      DisplayName: ValuePilot Renewal Alerts
+      Tags:
+        - Key: Project
+          Value: ValuePilot
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  AlertsEmailSubscription:
+    Type: AWS::SNS::Subscription
+    Condition: HasAlertEmail
+    Properties:
+      TopicArn: !Ref AlertsTopic
+      Protocol: email
+      Endpoint: !Ref AlertEmail
+
+  AlertsTopicPolicy:
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      Topics:
+        - !Ref AlertsTopic
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowLambdaPublish
+            Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: SNS:Publish
+            Resource: !Ref AlertsTopic
+            Condition:
+              StringEquals:
+                AWS:SourceAccount: !Ref AWS::AccountId
+          - Sid: AllowEventBridgePublish
+            Effect: Allow
+            Principal:
+              Service: events.amazonaws.com
+            Action: SNS:Publish
+            Resource: !Ref AlertsTopic
+
+  # ── SNS: Email intel scan summaries ──────────────────────────────────────────
+  EmailIntelSummariesTopic:
+    Type: AWS::SNS::Topic
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TopicName: !Sub valuepilot-email-intel-summaries-${Environment}
+      DisplayName: ValuePilot Email Intel Scan Summaries
+      Tags:
+        - Key: Project
+          Value: ValuePilot
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  # ── SNS: CloudWatch alarm notifications ──────────────────────────────────────
+  CloudWatchAlarmsTopic:
+    Type: AWS::SNS::Topic
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TopicName: !Sub valuepilot-cw-alarms-${Environment}
+      Tags:
+        - Key: Project
+          Value: ValuePilot
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  CloudWatchAlarmsEmailSubscription:
+    Type: AWS::SNS::Subscription
+    Condition: HasAlertEmail
+    Properties:
+      TopicArn: !Ref CloudWatchAlarmsTopic
+      Protocol: email
+      Endpoint: !Ref AlertEmail
+
+  # ── SQS: Renewal alerts DLQ ───────────────────────────────────────────────────
+  AlertsDlq:
+    Type: AWS::SQS::Queue
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      QueueName: !Sub valuepilot-event-dlq-${Environment}
+      MessageRetentionPeriod: 1209600
+      VisibilityTimeout: 60
+      Tags:
+        - Key: Project
+          Value: ValuePilot
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  AlertsDlqPolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !Ref AlertsDlq
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowLambdaSendMessage
+            Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sqs:SendMessage
+            Resource: !GetAtt AlertsDlq.Arn
+            Condition:
+              StringEquals:
+                AWS:SourceAccount: !Ref AWS::AccountId
+
+  # ── SQS: Email intel DLQ ──────────────────────────────────────────────────────
+  EmailIntelDlq:
+    Type: AWS::SQS::Queue
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      QueueName: !Sub valuepilot-email-intel-dlq-${Environment}
+      MessageRetentionPeriod: 1209600
+      VisibilityTimeout: 60
+      Tags:
+        - Key: Project
+          Value: ValuePilot
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  EmailIntelDlqPolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !Ref EmailIntelDlq
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowLambdaSendMessage
+            Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sqs:SendMessage
+            Resource: !GetAtt EmailIntelDlq.Arn
+            Condition:
+              StringEquals:
+                AWS:SourceAccount: !Ref AWS::AccountId
+
+Outputs:
+  AlertsTopicArn:
+    Value: !Ref AlertsTopic
+    Export:
+      Name: !Sub "valuepilot-${Environment}-alerts-topic-arn"
+  EmailIntelSummariesTopicArn:
+    Value: !Ref EmailIntelSummariesTopic
+    Export:
+      Name: !Sub "valuepilot-${Environment}-email-intel-summaries-topic-arn"
+  CloudWatchAlarmsTopicArn:
+    Value: !Ref CloudWatchAlarmsTopic
+    Export:
+      Name: !Sub "valuepilot-${Environment}-cw-alarms-topic-arn"
+  AlertsDlqArn:
+    Value: !GetAtt AlertsDlq.Arn
+    Export:
+      Name: !Sub "valuepilot-${Environment}-alerts-dlq-arn"
+  AlertsDlqName:
+    Value: !GetAtt AlertsDlq.QueueName
+    Export:
+      Name: !Sub "valuepilot-${Environment}-alerts-dlq-name"
+  EmailIntelDlqArn:
+    Value: !GetAtt EmailIntelDlq.Arn
+    Export:
+      Name: !Sub "valuepilot-${Environment}-email-intel-dlq-arn"
+  EmailIntelDlqName:
+    Value: !GetAtt EmailIntelDlq.QueueName
+    Export:
+      Name: !Sub "valuepilot-${Environment}-email-intel-dlq-name"

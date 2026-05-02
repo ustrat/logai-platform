@@ -1,0 +1,126 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: ValuePilot — Customer-managed KMS keys for DynamoDB and S3 encryption
+
+Parameters:
+  Environment:
+    Type: String
+    Default: production
+    AllowedValues: [development, staging, production]
+
+Resources:
+
+  # ── KMS key: DynamoDB tables ─────────────────────────────────────────────
+  DynamoDbCmk:
+    Type: AWS::KMS::Key
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      Description: !Sub "ValuePilot ${Environment} — DynamoDB table encryption CMK"
+      EnableKeyRotation: true
+      KeySpec: SYMMETRIC_DEFAULT
+      KeyUsage: ENCRYPT_DECRYPT
+      PendingWindowInDays: 30
+      KeyPolicy:
+        Version: "2012-10-17"
+        Statement:
+          # Account root can manage the key — prevents lockout
+          - Sid: AllowAccountRoot
+            Effect: Allow
+            Principal:
+              AWS: !Sub "arn:aws:iam::${AWS::AccountId}:root"
+            Action: "kms:*"
+            Resource: "*"
+          # DynamoDB service can use the key on behalf of any principal in this account
+          - Sid: AllowDynamoDBService
+            Effect: Allow
+            Principal:
+              Service: dynamodb.amazonaws.com
+            Action:
+              - kms:Encrypt
+              - kms:Decrypt
+              - kms:ReEncrypt*
+              - kms:GenerateDataKey*
+              - kms:DescribeKey
+              - kms:CreateGrant
+            Resource: "*"
+            Condition:
+              StringEquals:
+                kms:CallerAccount: !Ref AWS::AccountId
+      Tags:
+        - Key: Project
+          Value: ValuePilot
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  DynamoDbCmkAlias:
+    Type: AWS::KMS::Alias
+    Properties:
+      AliasName: !Sub "alias/valuepilot-${Environment}-dynamodb"
+      TargetKeyId: !Ref DynamoDbCmk
+
+  # ── KMS key: S3 buckets ───────────────────────────────────────────────────
+  S3Cmk:
+    Type: AWS::KMS::Key
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      Description: !Sub "ValuePilot ${Environment} — S3 bucket encryption CMK"
+      EnableKeyRotation: true
+      KeySpec: SYMMETRIC_DEFAULT
+      KeyUsage: ENCRYPT_DECRYPT
+      PendingWindowInDays: 30
+      KeyPolicy:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowAccountRoot
+            Effect: Allow
+            Principal:
+              AWS: !Sub "arn:aws:iam::${AWS::AccountId}:root"
+            Action: "kms:*"
+            Resource: "*"
+          # S3 needs to generate data keys when writing objects
+          - Sid: AllowS3Service
+            Effect: Allow
+            Principal:
+              Service: s3.amazonaws.com
+            Action:
+              - kms:GenerateDataKey*
+              - kms:Decrypt
+              - kms:DescribeKey
+            Resource: "*"
+            Condition:
+              StringEquals:
+                kms:CallerAccount: !Ref AWS::AccountId
+      Tags:
+        - Key: Project
+          Value: ValuePilot
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  S3CmkAlias:
+    Type: AWS::KMS::Alias
+    Properties:
+      AliasName: !Sub "alias/valuepilot-${Environment}-s3"
+      TargetKeyId: !Ref S3Cmk
+
+Outputs:
+  DynamoDbCmkArn:
+    Value: !GetAtt DynamoDbCmk.Arn
+    Export:
+      Name: !Sub "valuepilot-${Environment}-dynamodb-cmk-arn"
+  DynamoDbCmkId:
+    Value: !Ref DynamoDbCmk
+    Export:
+      Name: !Sub "valuepilot-${Environment}-dynamodb-cmk-id"
+  S3CmkArn:
+    Value: !GetAtt S3Cmk.Arn
+    Export:
+      Name: !Sub "valuepilot-${Environment}-s3-cmk-arn"
+  S3CmkId:
+    Value: !Ref S3Cmk
+    Export:
+      Name: !Sub "valuepilot-${Environment}-s3-cmk-id"

@@ -91,9 +91,9 @@ const CLEARANCE_LEVELS = ['None', 'Public Trust', 'Secret', 'Top Secret', 'TS/SC
 // ─── Sub-components ────────────────────────────────────────────────────────────
 function StatCard({ label, value, sub, accent }: { label: string; value: string | number; sub?: string; accent: string }) {
   return (
-    <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '16px 20px', borderLeft: `3px solid ${accent}` }}>
+    <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '16px 20px', borderLeft: `3px solid ${accent}` }}>
       <div style={{ fontSize: 11, color: 'var(--text-muted)', letterSpacing: '1.5px', marginBottom: 6 }}>{label}</div>
-      <div style={{ fontSize: 26, fontWeight: 800, color: '#fff', lineHeight: 1 }}>{value}</div>
+      <div style={{ fontSize: 26, fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1 }}>{value}</div>
       {sub && <div style={{ fontSize: 11, color: accent, marginTop: 4 }}>{sub}</div>}
     </div>
   );
@@ -168,9 +168,9 @@ function AddMemberModal({ orgType, products, onClose, onSave }: {
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-      <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8, padding: 28, width: 520, maxHeight: '90vh', overflowY: 'auto' }}>
+      <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 8, padding: 28, width: 520, maxHeight: '90vh', overflowY: 'auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-          <h3 style={{ fontSize: 14, fontWeight: 700, letterSpacing: '1px', color: '#fff' }}>ASSIGN LICENCE</h3>
+          <h3 style={{ fontSize: 14, fontWeight: 700, letterSpacing: '1px', color: 'var(--text-primary)' }}>ASSIGN LICENCE</h3>
           <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><X size={16} /></button>
         </div>
 
@@ -248,7 +248,7 @@ function Field({ label, value, onChange, placeholder }: { label: string; value: 
     <div style={{ marginBottom: 2 }}>
       <div style={{ fontSize: 9, letterSpacing: '1.5px', color: 'var(--text-muted)', marginBottom: 5 }}>{label}</div>
       <input value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
-        style={{ width: '100%', padding: '7px 10px', background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)', borderRadius: 4, color: '#fff', fontSize: 12, boxSizing: 'border-box' }} />
+        style={{ width: '100%', padding: '7px 10px', background: 'var(--bg-base)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text-primary)', fontSize: 12, boxSizing: 'border-box' }} />
     </div>
   );
 }
@@ -258,7 +258,7 @@ function SelectField({ label, value, onChange, options }: { label: string; value
     <div style={{ marginBottom: 10 }}>
       <div style={{ fontSize: 9, letterSpacing: '1.5px', color: 'var(--text-muted)', marginBottom: 5 }}>{label}</div>
       <select value={value} onChange={e => onChange(e.target.value)}
-        style={{ width: '100%', padding: '7px 10px', background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)', borderRadius: 4, color: '#fff', fontSize: 12 }}>
+        style={{ width: '100%', padding: '7px 10px', background: 'var(--bg-base)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text-primary)', fontSize: 12 }}>
         {options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
       </select>
     </div>
@@ -291,9 +291,9 @@ function OrgSettingsPanel({ org, onClose }: { org: OrgData; onClose: () => void 
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-      <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8, padding: 28, width: 500, maxHeight: '90vh', overflowY: 'auto' }}>
+      <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 8, padding: 28, width: 500, maxHeight: '90vh', overflowY: 'auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-          <h3 style={{ fontSize: 14, fontWeight: 700, letterSpacing: '1px', color: '#fff' }}>ORGANISATION SETTINGS</h3>
+          <h3 style={{ fontSize: 14, fontWeight: 700, letterSpacing: '1px', color: 'var(--text-primary)' }}>ORGANISATION SETTINGS</h3>
           <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><X size={16} /></button>
         </div>
 
@@ -371,7 +371,7 @@ function MemberActions({ member, orgType, onRevoke, onSuspend, onDelete }: {
         <MoreHorizontal size={13} />
       </button>
       {open && (
-        <div style={{ position: 'absolute', right: 0, top: 28, background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 6, zIndex: 100, minWidth: 160, boxShadow: '0 8px 24px rgba(0,0,0,0.5)' }}>
+        <div style={{ position: 'absolute', right: 0, top: 28, background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 6, zIndex: 100, minWidth: 160, boxShadow: '0 8px 24px rgba(0,0,0,0.5)' }}>
           {member.status !== 'revoked' && (
             <MenuBtn icon={<PauseCircle size={12} />} label={member.status === 'suspended' ? 'Reinstate' : 'Suspend'} color="#f97316"
               onClick={() => { setOpen(false); onSuspend(); }} />
@@ -485,31 +485,29 @@ export default function PartnerPortal() {
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24 }}>
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-            {isFederal
-              ? <Shield size={18} color="#7c3aed" />
-              : <Building2 size={18} color="#0891b2" />}
-            <h1 style={{ fontSize: 20, fontWeight: 800, color: '#fff', letterSpacing: '0.5px', margin: 0 }}>
-              Partner Portal
-            </h1>
-            <span style={{ fontSize: 10, padding: '3px 10px', borderRadius: 20, background: isFederal ? 'rgba(124,58,237,0.12)' : 'rgba(8,145,178,0.12)', color: isFederal ? '#7c3aed' : '#0891b2', letterSpacing: '1px', fontWeight: 700 }}>
-              {isFederal ? 'FEDERAL GOVERNMENT' : 'COMMERCIAL ENTERPRISE'}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+            <div style={{ width: 32, height: 32, borderRadius: 8, background: isFederal ? 'linear-gradient(135deg, #7c3aed, #0891b2)' : 'linear-gradient(135deg, #0891b2, #6366f1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {isFederal ? <Shield size={16} color="#fff" /> : <Building2 size={16} color="#fff" />}
+            </div>
+            <h1 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: 'var(--text-primary)' }}>Partner Portal</h1>
+            <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 4, background: isFederal ? 'rgba(124,58,237,0.1)' : 'rgba(8,145,178,0.1)', color: isFederal ? '#7c3aed' : '#0891b2', fontWeight: 600 }}>
+              {isFederal ? 'FEDERAL' : 'COMMERCIAL'}
             </span>
           </div>
-          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+          <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)' }}>
             {org?.orgName || 'Your Organisation'} · {org?.domain}
             {isFederal && org?.contractNumber && (
-              <span style={{ marginLeft: 10, color: '#7c3aed' }}>Contract {org.contractNumber}</span>
+              <span style={{ marginLeft: 10, color: '#7c3aed' }}>· Contract {org.contractNumber}</span>
             )}
-          </div>
+          </p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button onClick={() => setShowSettings(true)}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text-muted)', cursor: 'pointer', fontSize: 11 }}>
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text-secondary)', cursor: 'pointer', fontSize: 11 }}>
             <Settings2 size={13} /> Settings
           </button>
           <button onClick={() => setShowAddModal(true)}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', background: '#f59e0b', border: 'none', borderRadius: 4, color: '#000', cursor: 'pointer', fontSize: 11, fontWeight: 700, letterSpacing: '0.5px' }}>
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', background: 'var(--amber)', border: 'none', borderRadius: 6, color: '#000', cursor: 'pointer', fontSize: 11, fontWeight: 700, letterSpacing: '0.5px' }}>
             <Plus size={13} /> ASSIGN LICENCE
           </button>
         </div>
@@ -524,7 +522,7 @@ export default function PartnerPortal() {
       </div>
 
       {/* Licence pools */}
-      <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '16px 20px', marginBottom: 20 }}>
+      <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '16px 20px', marginBottom: 20 }}>
         <div style={{ fontSize: 10, letterSpacing: '1.5px', color: 'var(--text-muted)', marginBottom: 14 }}>LICENCE POOLS</div>
         <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.max(1, products.length)}, 1fr)`, gap: 24 }}>
           {products.map(p => <PoolBar key={p} product={p} pool={pools[p]} />)}
@@ -550,7 +548,7 @@ export default function PartnerPortal() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 200, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)', borderRadius: 4, padding: '7px 12px' }}>
               <Search size={13} color="var(--text-muted)" />
               <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search name, email, department..."
-                style={{ background: 'transparent', border: 'none', outline: 'none', color: '#fff', fontSize: 12, flex: 1 }} />
+                style={{ background: 'transparent', border: 'none', outline: 'none', color: 'var(--text-primary)', fontSize: 12, flex: 1 }} />
             </div>
             <FilterSelect value={filterStatus} onChange={setFilterStatus} options={[['','All Status'],['active','Active'],['pending','Pending'],['suspended','Suspended'],['revoked','Revoked']]} />
             {products.length > 1 && (
@@ -573,13 +571,13 @@ export default function PartnerPortal() {
               <Loader2 size={18} style={{ animation: 'spin 1s linear infinite', display: 'inline-block' }} />
             </div>
           ) : members.length === 0 ? (
-            <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '48px 24px', textAlign: 'center' }}>
+            <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '48px 24px', textAlign: 'center' }}>
               <Users size={32} color="var(--text-muted)" style={{ display: 'block', margin: '0 auto 12px' }} />
               <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 4 }}>No members found</div>
               <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Assign your first licence to get started.</div>
             </div>
           ) : (
-            <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden' }}>
+            <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden' }}>
               {/* Table header */}
               <div style={{ display: 'grid', gridTemplateColumns: '2fr 1.5fr 1fr 1fr 1fr 80px', gap: 0, padding: '10px 16px', borderBottom: '1px solid var(--border)', background: 'rgba(255,255,255,0.02)' }}>
                 {['MEMBER', 'DEPARTMENT', 'PRODUCTS', 'ROLE', 'STATUS', ''].map((h, i) => (
@@ -599,7 +597,7 @@ export default function PartnerPortal() {
                           {member.name.charAt(0).toUpperCase()}
                         </div>
                         <div>
-                          <div style={{ fontSize: 12, color: '#fff', fontWeight: 600 }}>{member.name}</div>
+                          <div style={{ fontSize: 12, color: 'var(--text-primary)', fontWeight: 600 }}>{member.name}</div>
                           <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{member.email}</div>
                         </div>
                         {isFederal && member.cacEnabled && (
@@ -612,7 +610,7 @@ export default function PartnerPortal() {
                     </div>
                     {/* Department */}
                     <div>
-                      <div style={{ fontSize: 11, color: '#fff' }}>{member.department}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-primary)' }}>{member.department}</div>
                       {member.jobTitle && <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{member.jobTitle}</div>}
                     </div>
                     {/* Products */}
@@ -661,7 +659,7 @@ export default function PartnerPortal() {
 
       {/* ── AUDIT TAB ── */}
       {tab === 'audit' && (
-        <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden' }}>
+        <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden' }}>
           {auditQuery.isLoading ? (
             <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>
               <Loader2 size={18} style={{ animation: 'spin 1s linear infinite', display: 'inline-block' }} />
@@ -673,7 +671,7 @@ export default function PartnerPortal() {
               <div key={entry.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 14, padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
                 <AuditIcon action={entry.action} />
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 12, color: '#fff' }}>{entry.detail}</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-primary)' }}>{entry.detail}</div>
                   {entry.targetEmail && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{entry.targetName} · {entry.targetEmail}</div>}
                   <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 3 }}>by {entry.actorEmail} · {new Date(entry.timestamp).toLocaleString()}</div>
                 </div>
@@ -705,7 +703,7 @@ function DetailCell({ label, value }: { label: string; value: string }) {
   return (
     <div>
       <div style={{ fontSize: 9, letterSpacing: '1.5px', color: 'var(--text-muted)', marginBottom: 3 }}>{label.toUpperCase()}</div>
-      <div style={{ fontSize: 11, color: '#fff' }}>{value}</div>
+      <div style={{ fontSize: 11, color: 'var(--text-primary)' }}>{value}</div>
     </div>
   );
 }

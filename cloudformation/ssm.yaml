@@ -1,0 +1,190 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  ValuePilot — SSM Parameter Store placeholders and Bedrock model IDs.
+  All SecureString parameters are created with value "REPLACE_ME".
+  After deploying this stack, set real values via CLI:
+    aws ssm put-parameter --name <name> --value <secret> --type SecureString --overwrite
+  CloudFormation will NOT overwrite values on subsequent stack updates because
+  each parameter uses a DeletionPolicy of Retain.
+
+Parameters:
+  Environment:
+    Type: String
+    Default: production
+    AllowedValues: [development, staging, production]
+
+Resources:
+
+  # ── Email Intelligence OAuth credentials ─────────────────────────────────────
+  GoogleClientId:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /valuepilot/email-intel/google-client-id
+      Type: String
+      Value: REPLACE_ME
+      Description: Google OAuth 2.0 Client ID for Gmail email intelligence
+      Tags:
+        Project: ValuePilot
+        Environment: !Ref Environment
+        ManagedBy: CloudFormation
+
+  GoogleClientSecret:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /valuepilot/email-intel/google-client-secret
+      Type: String
+      Value: REPLACE_ME
+      Description: Google OAuth 2.0 Client Secret for Gmail email intelligence
+      Tags:
+        Project: ValuePilot
+        Environment: !Ref Environment
+        ManagedBy: CloudFormation
+
+  MsClientId:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /valuepilot/email-intel/ms-client-id
+      Type: String
+      Value: REPLACE_ME
+      Description: Microsoft Azure AD Client ID for Outlook email intelligence
+      Tags:
+        Project: ValuePilot
+        Environment: !Ref Environment
+        ManagedBy: CloudFormation
+
+  MsClientSecret:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /valuepilot/email-intel/ms-client-secret
+      Type: String
+      Value: REPLACE_ME
+      Description: Microsoft Azure AD Client Secret for Outlook email intelligence
+      Tags:
+        Project: ValuePilot
+        Environment: !Ref Environment
+        ManagedBy: CloudFormation
+
+  # ── Plaid credentials ─────────────────────────────────────────────────────────
+  PlaidClientId:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /valuepilot/plaid/client-id
+      Type: String
+      Value: REPLACE_ME
+      Description: Plaid API Client ID
+      Tags:
+        Project: ValuePilot
+        Environment: !Ref Environment
+        ManagedBy: CloudFormation
+
+  PlaidSecret:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /valuepilot/plaid/secret
+      Type: String
+      Value: REPLACE_ME
+      Description: Plaid API Secret (environment-specific)
+      Tags:
+        Project: ValuePilot
+        Environment: !Ref Environment
+        ManagedBy: CloudFormation
+
+  # ── Stripe credentials ────────────────────────────────────────────────────────
+  StripeSecretKey:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /valuepilot/stripe/secret-key
+      Type: String
+      Value: REPLACE_ME
+      Description: "Stripe Secret Key (sk_live_... or sk_test_...)"
+      Tags:
+        Project: ValuePilot
+        Environment: !Ref Environment
+        ManagedBy: CloudFormation
+
+  StripeWebhookSecret:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /valuepilot/stripe/webhook-secret
+      Type: String
+      Value: REPLACE_ME
+      Description: "Stripe Webhook Endpoint Signing Secret (whsec_...)"
+      Tags:
+        Project: ValuePilot
+        Environment: !Ref Environment
+        ManagedBy: CloudFormation
+
+  # ── JWT secret ────────────────────────────────────────────────────────────────
+  JwtSecret:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /valuepilot/api/jwt-secret
+      Type: String
+      Value: REPLACE_ME
+      Description: JWT signing secret for API authentication
+      Tags:
+        Project: ValuePilot
+        Environment: !Ref Environment
+        ManagedBy: CloudFormation
+
+  # ── SMTP credentials ──────────────────────────────────────────────────────────
+  SmtpUser:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /valuepilot/smtp/user
+      Type: String
+      Value: REPLACE_ME
+      Description: SMTP username for invoice email delivery
+      Tags:
+        Project: ValuePilot
+        Environment: !Ref Environment
+        ManagedBy: CloudFormation
+
+  SmtpPassword:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /valuepilot/smtp/password
+      Type: String
+      Value: REPLACE_ME
+      Description: SMTP password for invoice email delivery
+      Tags:
+        Project: ValuePilot
+        Environment: !Ref Environment
+        ManagedBy: CloudFormation
+
+  # ── Bedrock model IDs (plain strings, not secrets) ────────────────────────────
+  BedrockSonnetModelId:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /valuepilot/bedrock/sonnet-model-id
+      Type: String
+      Value: us.anthropic.claude-sonnet-4-6
+      Description: Bedrock inference profile ID for Claude Sonnet 4.6 — complex reasoning tasks
+      Tags:
+        Project: ValuePilot
+        Environment: !Ref Environment
+        ManagedBy: CloudFormation
+
+  BedrockHaikuModelId:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /valuepilot/bedrock/haiku-model-id
+      Type: String
+      Value: us.anthropic.claude-haiku-4-5-20251001
+      Description: Bedrock inference profile ID for Claude Haiku 4.5 — high-volume fast inference
+      Tags:
+        Project: ValuePilot
+        Environment: !Ref Environment
+        ManagedBy: CloudFormation
+
+Outputs:
+  BedrockSonnetModelIdParamName:
+    Value: !Ref BedrockSonnetModelId
+    Description: SSM parameter name for Claude Sonnet model ID
+    Export:
+      Name: !Sub "valuepilot-${Environment}-bedrock-sonnet-model-id-param"
+  BedrockHaikuModelIdParamName:
+    Value: !Ref BedrockHaikuModelId
+    Description: SSM parameter name for Claude Haiku model ID
+    Export:
+      Name: !Sub "valuepilot-${Environment}-bedrock-haiku-model-id-param"

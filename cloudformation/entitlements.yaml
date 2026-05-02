@@ -1,0 +1,717 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  ValuePilot — Software Entitlement System
+  Catalog, Subscriptions, Entitlements DynamoDB tables with Streams,
+  EventBridge bus, Kinesis Firehose, S3 Object Lock audit bucket,
+  Pre-Token Generation Lambda, and DynamoDB Stream Processor Lambda.
+
+Parameters:
+  Environment:
+    Type: String
+    Default: production
+    AllowedValues: [development, staging, production]
+
+Resources:
+
+  # ===========================================================================
+  # DynamoDB — Catalog (plans + features)
+  # PK: PLAN#<planId>  SK: FEATURE#<featureKey>
+  # ===========================================================================
+
+  CatalogTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub vp-catalog-${Environment}
+      BillingMode: PAY_PER_REQUEST
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+        SSEType: KMS
+        KMSMasterKeyId:
+          Fn::ImportValue: !Sub "valuepilot-${Environment}-dynamodb-cmk-arn"
+      AttributeDefinitions:
+        - { AttributeName: PK, AttributeType: S }
+        - { AttributeName: SK, AttributeType: S }
+      KeySchema:
+        - { AttributeName: PK, KeyType: HASH }
+        - { AttributeName: SK, KeyType: RANGE }
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+      Tags:
+        - { Key: Project, Value: ValuePilot }
+        - { Key: Environment, Value: !Ref Environment }
+
+  # ===========================================================================
+  # DynamoDB — Subscriptions (commercial relationship per tenant)
+  # PK: TENANT#<tenantId>  SK: SUB#<subscriptionId>
+  # GSI: status-index for active subscription lookups
+  # ===========================================================================
+
+  EntSubscriptionsTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub vp-ent-subscriptions-${Environment}
+      BillingMode: PAY_PER_REQUEST
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+        SSEType: KMS
+        KMSMasterKeyId:
+          Fn::ImportValue: !Sub "valuepilot-${Environment}-dynamodb-cmk-arn"
+      AttributeDefinitions:
+        - { AttributeName: PK,       AttributeType: S }
+        - { AttributeName: SK,       AttributeType: S }
+        - { AttributeName: tenantId, AttributeType: S }
+        - { AttributeName: status,   AttributeType: S }
+      KeySchema:
+        - { AttributeName: PK, KeyType: HASH }
+        - { AttributeName: SK, KeyType: RANGE }
+      GlobalSecondaryIndexes:
+        - IndexName: tenantId-status-index
+          KeySchema:
+            - { AttributeName: tenantId, KeyType: HASH }
+            - { AttributeName: status,   KeyType: RANGE }
+          Projection:
+            ProjectionType: ALL
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+      Tags:
+        - { Key: Project, Value: ValuePilot }
+        - { Key: Environment, Value: !Ref Environment }
+
+  # ===========================================================================
+  # DynamoDB — Entitlements (runtime access decisions per user per feature)
+  # PK: USER#<userId>  SK: FEATURE#<featureKey>
+  # Special SK META#version tracks the entitlements_version counter
+  # ===========================================================================
+
+  EntitlementsTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub vp-entitlements-${Environment}
+      BillingMode: PAY_PER_REQUEST
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+        SSEType: KMS
+        KMSMasterKeyId:
+          Fn::ImportValue: !Sub "valuepilot-${Environment}-dynamodb-cmk-arn"
+      AttributeDefinitions:
+        - { AttributeName: PK,       AttributeType: S }
+        - { AttributeName: SK,       AttributeType: S }
+        - { AttributeName: tenantId, AttributeType: S }
+        - { AttributeName: userId,   AttributeType: S }
+      KeySchema:
+        - { AttributeName: PK, KeyType: HASH }
+        - { AttributeName: SK, KeyType: RANGE }
+      GlobalSecondaryIndexes:
+        - IndexName: tenantId-userId-index
+          KeySchema:
+            - { AttributeName: tenantId, KeyType: HASH }
+            - { AttributeName: userId,   KeyType: RANGE }
+          Projection:
+            ProjectionType: ALL
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+      Tags:
+        - { Key: Project, Value: ValuePilot }
+        - { Key: Environment, Value: !Ref Environment }
+
+  # ===========================================================================
+  # EventBridge — Entitlement event bus
+  # All state changes publish here; rules fan out to audit + alerts
+  # ===========================================================================
+
+  EntitlementEventBus:
+    Type: AWS::Events::EventBus
+    Properties:
+      Name: !Sub valuepilot-entitlement-events-${Environment}
+      Tags:
+        - { Key: Project, Value: ValuePilot }
+        - { Key: Environment, Value: !Ref Environment }
+
+  # ===========================================================================
+  # S3 — Immutable audit bucket with Object Lock (7-year compliance retention)
+  # ===========================================================================
+
+  AuditBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Sub valuepilot-audit-${Environment}-${AWS::AccountId}
+      ObjectLockEnabled: true
+      ObjectLockConfiguration:
+        ObjectLockEnabled: Enabled
+        Rule:
+          DefaultRetention:
+            Mode: COMPLIANCE
+            Years: 7
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: aws:kms
+              KMSMasterKeyID:
+                Fn::ImportValue: !Sub "valuepilot-${Environment}-s3-cmk-arn"
+            BucketKeyEnabled: true
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      VersioningConfiguration:
+        Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+          - Id: GlacierAfter90Days
+            Status: Enabled
+            Transitions:
+              - TransitionInDays: 90
+                StorageClass: GLACIER_IR
+      Tags:
+        - { Key: Project,  Value: ValuePilot }
+        - { Key: Purpose,  Value: ImmutableAuditLog }
+        - { Key: Environment, Value: !Ref Environment }
+
+  AuditBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref AuditBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: DenyNonTLS
+            Effect: Deny
+            Principal: "*"
+            Action: s3:*
+            Resource:
+              - !GetAtt AuditBucket.Arn
+              - !Sub "${AuditBucket.Arn}/*"
+            Condition:
+              Bool:
+                aws:SecureTransport: "false"
+          - Sid: AllowFirehoseWrite
+            Effect: Allow
+            Principal:
+              Service: firehose.amazonaws.com
+            Action: s3:PutObject
+            Resource: !Sub "${AuditBucket.Arn}/*"
+
+  # ===========================================================================
+  # Kinesis Firehose — buffers EventBridge events to S3 (compressed, partitioned)
+  # ===========================================================================
+
+  FirehoseRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub valuepilot-${Environment}-firehose-audit-role
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: firehose.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: firehose-s3-kms
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: [s3:PutObject, s3:GetBucketLocation, s3:ListBucket]
+                Resource:
+                  - !GetAtt AuditBucket.Arn
+                  - !Sub "${AuditBucket.Arn}/*"
+              - Effect: Allow
+                Action: [kms:GenerateDataKey, kms:Decrypt]
+                Resource:
+                  Fn::ImportValue: !Sub "valuepilot-${Environment}-s3-cmk-arn"
+
+  AuditFirehose:
+    Type: AWS::KinesisFirehose::DeliveryStream
+    Properties:
+      DeliveryStreamName: !Sub valuepilot-audit-${Environment}
+      DeliveryStreamType: DirectPut
+      ExtendedS3DestinationConfiguration:
+        BucketARN: !GetAtt AuditBucket.Arn
+        RoleARN: !GetAtt FirehoseRole.Arn
+        Prefix: "events/year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/type=!{partitionKeyFromQuery:eventType}/"
+        ErrorOutputPrefix: "errors/year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/!{firehose:error-output-type}/"
+        BufferingHints:
+          IntervalInSeconds: 300
+          SizeInMBs: 64
+        CompressionFormat: GZIP
+        EncryptionConfiguration:
+          KMSEncryptionConfig:
+            AWSKMSKeyARN:
+              Fn::ImportValue: !Sub "valuepilot-${Environment}-s3-cmk-arn"
+        DynamicPartitioningConfiguration:
+          Enabled: true
+        ProcessingConfiguration:
+          Enabled: true
+          Processors:
+            - Type: MetadataExtraction
+              Parameters:
+                - ParameterName: MetadataExtractionQuery
+                  ParameterValue: "{eventType:.detail-type}"
+                - ParameterName: JsonParsingEngine
+                  ParameterValue: JQ-1.6
+
+  # EventBridge rule: all entitlement events → Firehose
+  EventToFirehoseRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub valuepilot-${Environment}-events-to-firehose-role
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: events.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: put-firehose
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: firehose:PutRecord
+                Resource: !GetAtt AuditFirehose.Arn
+
+  AllEventsToAuditRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub valuepilot-${Environment}-all-to-audit
+      EventBusName: !Ref EntitlementEventBus
+      EventPattern:
+        source: ["valuepilot.entitlements"]
+      Targets:
+        - Id: FirehoseAudit
+          Arn: !GetAtt AuditFirehose.Arn
+          RoleArn: !GetAtt EventToFirehoseRole.Arn
+
+  # ===========================================================================
+  # Lambda — shared execution role
+  # ===========================================================================
+
+  EntitlementLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub valuepilot-${Environment}-entitlement-lambda-role
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+      Policies:
+        - PolicyName: entitlement-data
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: DynamoReadWrite
+                Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:DeleteItem
+                  - dynamodb:Query
+                  - dynamodb:BatchGetItem
+                  - dynamodb:BatchWriteItem
+                Resource:
+                  - !GetAtt EntitlementsTable.Arn
+                  - !Sub "${EntitlementsTable.Arn}/index/*"
+                  - !GetAtt EntSubscriptionsTable.Arn
+                  - !Sub "${EntSubscriptionsTable.Arn}/index/*"
+                  - !GetAtt CatalogTable.Arn
+                  - !Sub "${CatalogTable.Arn}/index/*"
+              - Sid: DynamoKms
+                Effect: Allow
+                Action: [kms:Decrypt, kms:GenerateDataKey, kms:DescribeKey]
+                Resource:
+                  Fn::ImportValue: !Sub "valuepilot-${Environment}-dynamodb-cmk-arn"
+              - Sid: DynamoStreams
+                Effect: Allow
+                Action:
+                  - dynamodb:GetRecords
+                  - dynamodb:GetShardIterator
+                  - dynamodb:DescribeStream
+                  - dynamodb:ListStreams
+                Resource: "*"
+              - Sid: EventBridgePut
+                Effect: Allow
+                Action: events:PutEvents
+                Resource: !GetAtt EntitlementEventBus.Arn
+              - Sid: SqsDLQ
+                Effect: Allow
+                Action: [sqs:SendMessage]
+                Resource: !GetAtt StreamProcessorDLQ.Arn
+
+  # ===========================================================================
+  # Lambda — Pre-Token Generation
+  # Runs on every Cognito login + token refresh.
+  # Injects plan, subscription_status, entitlements_version into the JWT.
+  # ===========================================================================
+
+  PreTokenLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub valuepilot-${Environment}-pre-token
+      Runtime: nodejs20.x
+      Handler: index.handler
+      Role: !GetAtt EntitlementLambdaRole.Arn
+      Timeout: 5
+      MemorySize: 256
+      Environment:
+        Variables:
+          ENTITLEMENTS_TABLE: !Ref EntitlementsTable
+          SUBSCRIPTIONS_TABLE: !Ref EntSubscriptionsTable
+          CATALOG_TABLE: !Ref CatalogTable
+          REGION: !Ref AWS::Region
+      Code:
+        ZipFile: |
+          const {
+            DynamoDBClient,
+            GetItemCommand,
+            QueryCommand,
+          } = require("@aws-sdk/client-dynamodb");
+
+          const dynamo = new DynamoDBClient({ region: process.env.REGION || "us-east-1" });
+
+          function uv(attr) {
+            if (!attr) return undefined;
+            return attr.S || attr.N || attr.BOOL;
+          }
+
+          exports.handler = async (event) => {
+            const userId = event.request.userAttributes.sub;
+            const customRole = event.request.userAttributes["custom:role"] || "analyst";
+
+            let plan = "free";
+            let subscriptionStatus = "active";
+            let tenantId = userId;
+            let entitlementsVersion = "v1";
+
+            try {
+              // Look up active subscription for this user
+              const subRes = await dynamo.send(new QueryCommand({
+                TableName: process.env.SUBSCRIPTIONS_TABLE,
+                KeyConditionExpression: "PK = :pk AND begins_with(SK, :prefix)",
+                FilterExpression: "#s = :active",
+                ExpressionAttributeNames: { "#s": "status" },
+                ExpressionAttributeValues: {
+                  ":pk":     { S: "TENANT#" + userId },
+                  ":prefix": { S: "SUB#" },
+                  ":active": { S: "active" },
+                },
+                Limit: 1,
+              }));
+
+              if (subRes.Items && subRes.Items.length > 0) {
+                const item = subRes.Items[0];
+                plan = uv(item.planId) || "free";
+                subscriptionStatus = uv(item.status) || "active";
+                tenantId = uv(item.tenantId) || userId;
+              }
+
+              // Get current entitlements version counter
+              const verRes = await dynamo.send(new GetItemCommand({
+                TableName: process.env.ENTITLEMENTS_TABLE,
+                Key: {
+                  PK: { S: "USER#" + userId },
+                  SK: { S: "META#version" },
+                },
+              }));
+
+              if (verRes.Item && verRes.Item.version) {
+                entitlementsVersion = uv(verRes.Item.version);
+              }
+            } catch (err) {
+              // Fail open: log and use free-tier defaults
+              console.error("[pre-token] lookup failed:", err.message);
+              subscriptionStatus = "degraded";
+            }
+
+            event.response = {
+              claimsOverrideDetails: {
+                claimsToAddOrOverride: {
+                  tenantId,
+                  plan,
+                  subscription_status: subscriptionStatus,
+                  entitlements_version: entitlementsVersion,
+                  "custom:role": customRole,
+                },
+              },
+            };
+
+            return event;
+          };
+      Tags:
+        - { Key: Project, Value: ValuePilot }
+        - { Key: Environment, Value: !Ref Environment }
+
+  PreTokenLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt PreTokenLambda.Arn
+      Action: lambda:InvokeFunction
+      Principal: cognito-idp.amazonaws.com
+      SourceArn:
+        !Sub
+          - "arn:${AWS::Partition}:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${PoolId}"
+          - PoolId:
+              Fn::ImportValue: !Sub "valuepilot-${Environment}-cognito-user-pool-id"
+
+  # ===========================================================================
+  # Lambda — DynamoDB Stream Processor → EventBridge
+  # Reads stream records from Entitlements + Subscriptions tables and
+  # publishes structured events to the EventBridge bus.
+  # ===========================================================================
+
+  StreamProcessorDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub valuepilot-${Environment}-stream-processor-dlq
+      MessageRetentionPeriod: 1209600
+      Tags:
+        - { Key: Project, Value: ValuePilot }
+
+  StreamProcessorLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub valuepilot-${Environment}-stream-processor
+      Runtime: nodejs20.x
+      Handler: index.handler
+      Role: !GetAtt EntitlementLambdaRole.Arn
+      Timeout: 60
+      MemorySize: 256
+      Environment:
+        Variables:
+          EVENT_BUS_NAME: !Ref EntitlementEventBus
+          REGION: !Ref AWS::Region
+      Code:
+        ZipFile: |
+          const {
+            EventBridgeClient,
+            PutEventsCommand,
+          } = require("@aws-sdk/client-eventbridge");
+          const { randomUUID } = require("crypto");
+
+          const eb = new EventBridgeClient({ region: process.env.REGION || "us-east-1" });
+
+          function uv(attr) {
+            if (!attr) return undefined;
+            return attr.S || attr.N || attr.BOOL;
+          }
+
+          function unmarshallSimple(item) {
+            if (!item) return null;
+            const out = {};
+            for (const [k, v] of Object.entries(item)) {
+              out[k] = uv(v) !== undefined ? uv(v) : v;
+            }
+            return out;
+          }
+
+          function resolveEventType(record) {
+            const arn = record.eventSourceARN || "";
+            const tableName = arn.split("/")[1] || "";
+            const op = record.eventName;
+            if (tableName.includes("entitlement")) {
+              return op === "INSERT" ? "EntitlementGranted"
+                   : op === "REMOVE" ? "EntitlementRevoked"
+                   : "EntitlementUpdated";
+            }
+            if (tableName.includes("subscription")) {
+              return op === "INSERT" ? "SubscriptionCreated"
+                   : op === "REMOVE" ? "SubscriptionCanceled"
+                   : "SubscriptionUpdated";
+            }
+            return "RecordChanged." + tableName + "." + op;
+          }
+
+          exports.handler = async (event) => {
+            const correlationId = randomUUID();
+            const entries = [];
+
+            for (const record of event.Records) {
+              if (record.eventName === "INSERT" || record.eventName === "MODIFY" || record.eventName === "REMOVE") {
+                const newImage = unmarshallSimple(record.dynamodb.NewImage);
+                const oldImage = unmarshallSimple(record.dynamodb.OldImage);
+                const item = newImage || oldImage || {};
+
+                entries.push({
+                  EventBusName: process.env.EVENT_BUS_NAME,
+                  Source: "valuepilot.entitlements",
+                  DetailType: resolveEventType(record),
+                  Detail: JSON.stringify({
+                    eventId:       randomUUID(),
+                    eventVersion:  "1.0",
+                    occurredAt:    new Date().toISOString(),
+                    tenantId:      item.tenantId || "unknown",
+                    correlationId,
+                    causationId:   null,
+                    actor: {
+                      type: "system",
+                      id:   "stream-processor",
+                      impersonating: null,
+                    },
+                    payload: { newImage, oldImage },
+                  }),
+                  Time: new Date(),
+                });
+              }
+            }
+
+            // EventBridge max 10 entries per call
+            const failures = [];
+            for (let i = 0; i < entries.length; i += 10) {
+              const res = await eb.send(new PutEventsCommand({ Entries: entries.slice(i, i + 10) }));
+              if (res.FailedEntryCount > 0) {
+                failures.push(...res.Entries
+                  .map((e, idx) => e.ErrorCode ? { itemIdentifier: event.Records[i + idx].dynamodb.SequenceNumber } : null)
+                  .filter(Boolean));
+              }
+            }
+
+            return { batchItemFailures: failures };
+          };
+      Tags:
+        - { Key: Project, Value: ValuePilot }
+        - { Key: Environment, Value: !Ref Environment }
+
+  EntitlementsStreamMapping:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      EventSourceArn: !GetAtt EntitlementsTable.StreamArn
+      FunctionName: !GetAtt StreamProcessorLambda.Arn
+      StartingPosition: LATEST
+      BatchSize: 100
+      MaximumBatchingWindowInSeconds: 5
+      BisectBatchOnFunctionError: true
+      DestinationConfig:
+        OnFailure:
+          Destination: !GetAtt StreamProcessorDLQ.Arn
+
+  SubscriptionsStreamMapping:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      EventSourceArn: !GetAtt EntSubscriptionsTable.StreamArn
+      FunctionName: !GetAtt StreamProcessorLambda.Arn
+      StartingPosition: LATEST
+      BatchSize: 100
+      MaximumBatchingWindowInSeconds: 5
+      BisectBatchOnFunctionError: true
+      DestinationConfig:
+        OnFailure:
+          Destination: !GetAtt StreamProcessorDLQ.Arn
+
+  # ===========================================================================
+  # Glue + Athena — query the immutable S3 audit log with SQL
+  # ===========================================================================
+
+  AuditGlueDatabase:
+    Type: AWS::Glue::Database
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseInput:
+        Name: !Sub valuepilot_audit_${Environment}
+        Description: Athena-queryable immutable audit log for ValuePilot entitlement events
+
+  AuditAthenaWorkgroup:
+    Type: AWS::Athena::WorkGroup
+    Properties:
+      Name: !Sub valuepilot-audit-${Environment}
+      WorkGroupConfiguration:
+        ResultConfiguration:
+          OutputLocation: !Sub "s3://${AuditBucket}/athena-results/"
+          EncryptionConfiguration:
+            EncryptionOption: SSE_KMS
+            KmsKey:
+              Fn::ImportValue: !Sub "valuepilot-${Environment}-s3-cmk-arn"
+        EnforceWorkGroupConfiguration: true
+        PublishCloudWatchMetricsEnabled: true
+      Tags:
+        - { Key: Project, Value: ValuePilot }
+
+  # ===========================================================================
+  # CloudWatch alarms — DLQ depth and Firehose delivery failures
+  # ===========================================================================
+
+  DLQDepthAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub valuepilot-${Environment}-stream-dlq-non-empty
+      AlarmDescription: Stream processor DLQ has messages — entitlement events may not be published
+      MetricName: ApproximateNumberOfMessagesVisible
+      Namespace: AWS/SQS
+      Dimensions:
+        - Name: QueueName
+          Value: !GetAtt StreamProcessorDLQ.QueueName
+      Statistic: Sum
+      Period: 60
+      EvaluationPeriods: 1
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+
+Outputs:
+
+  EntitlementsTableName:
+    Value: !Ref EntitlementsTable
+    Export:
+      Name: !Sub "valuepilot-${Environment}-entitlements-table"
+
+  EntitlementsTableArn:
+    Value: !GetAtt EntitlementsTable.Arn
+    Export:
+      Name: !Sub "valuepilot-${Environment}-entitlements-table-arn"
+
+  SubscriptionsTableName:
+    Value: !Ref EntSubscriptionsTable
+    Export:
+      Name: !Sub "valuepilot-${Environment}-ent-subscriptions-table"
+
+  CatalogTableName:
+    Value: !Ref CatalogTable
+    Export:
+      Name: !Sub "valuepilot-${Environment}-catalog-table"
+
+  EventBusName:
+    Value: !Ref EntitlementEventBus
+    Export:
+      Name: !Sub "valuepilot-${Environment}-entitlement-event-bus"
+
+  EventBusArn:
+    Value: !GetAtt EntitlementEventBus.Arn
+    Export:
+      Name: !Sub "valuepilot-${Environment}-entitlement-event-bus-arn"
+
+  AuditBucketName:
+    Value: !Ref AuditBucket
+    Export:
+      Name: !Sub "valuepilot-${Environment}-audit-bucket"
+
+  AuditAthenaWorkgroup:
+    Value: !Ref AuditAthenaWorkgroup
+    Export:
+      Name: !Sub "valuepilot-${Environment}-audit-athena-workgroup"
+
+  PreTokenLambdaArn:
+    Value: !GetAtt PreTokenLambda.Arn
+    Description: Attach this ARN to Cognito User Pool PreTokenGenerationConfig
+    Export:
+      Name: !Sub "valuepilot-${Environment}-pre-token-lambda-arn"

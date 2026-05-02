@@ -32,9 +32,10 @@ class MLServiceClient {
     start_date?: string;
     end_date?: string;
     limit?: number;
+    transactions?: unknown[];
   }): Promise<InferenceResponse> {
     try {
-      logger.debug(`Calling ML service /analyze for account: ${params.account_id || 'all'}`);
+      logger.info(`[mlClient] analyze — txns: ${params.transactions?.length ?? 0}, account: ${params.account_id || 'all'}`);
       const res = await this.client.post('/api/v1/inference/analyze', params);
       return res.data;
     } catch (err: any) {

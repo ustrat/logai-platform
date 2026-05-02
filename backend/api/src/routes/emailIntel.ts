@@ -11,6 +11,7 @@
 
 import { Router, Request, Response } from 'express';
 import { authenticate } from '../middleware/auth';
+import { getSecrets } from '../lib/secretsManager';
 import { randomUUID } from 'crypto';
 import fs from 'fs';
 import path from 'path';
@@ -66,11 +67,8 @@ function save(s: ConnectionStore) {
 
 // ── Gmail OAuth ───────────────────────────────────────────────────────────────
 router.get('/connect/gmail/url', (req: Request, res: Response) => {
-  const clientId     = process.env.GOOGLE_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-  const redirectUri  = process.env.GOOGLE_REDIRECT_URI || `http://localhost:4000/api/v1/email-intel/connect/gmail/callback`;
-  if (!clientId || !clientSecret)
-    return res.status(400).json({ success: false, error: 'Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in .env' });
+  const { clientId, clientSecret } = getSecrets().google;
+  const redirectUri = process.env.GOOGLE_REDIRECT_URI || `http://localhost:4000/api/v1/email-intel/connect/gmail/callback`;
   res.json({ success: true, data: { url: buildGmailAuthUrl(clientId, clientSecret, redirectUri) } });
 });
 
@@ -81,8 +79,7 @@ router.get('/connect/gmail/callback', async (req: Request, res: Response) => {
 
   const user = (req as any).user;
   try {
-    const clientId    = process.env.GOOGLE_CLIENT_ID!;
-    const clientSecret = process.env.GOOGLE_CLIENT_SECRET!;
+    const { clientId, clientSecret } = getSecrets().google;
     const redirectUri = process.env.GOOGLE_REDIRECT_URI || `http://localhost:4000/api/v1/email-intel/connect/gmail/callback`;
     const { accessToken, refreshToken, email } = await exchangeGmailCode(code, clientId, clientSecret, redirectUri);
 

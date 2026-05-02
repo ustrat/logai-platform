@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List, Dict, Any
 import traceback
 
 from ..services.csv_data_service import (
@@ -20,9 +20,48 @@ pattern_recognizer = PatternRecognizer()
 recommendation_engine = RecommendationEngine()
 
 
+def _normalize_plaid(txns: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Map Plaid transaction fields to the internal ML schema."""
+    out = []
+    for t in txns:
+        out.append({
+            "transaction_id":              t.get("transaction_id", ""),
+            "account_id":                  t.get("account_id", "unknown"),
+            "customer_id":                 t.get("account_id", "unknown"),
+            "subscription_id":             t.get("transaction_id", ""),
+            "projected_charge_usd":        abs(float(t.get("amount", 0))),
+            "expected_charge_usd":         abs(float(t.get("amount", 0))),
+            "current_plan_amount_usd":     abs(float(t.get("amount", 0))),
+            "price_delta_usd":             0.0,
+            "usage_change_pct":            0.0,
+            "risk_score":                  0.0,
+            "confidence_score":            1.0,
+            "days_to_renewal":             30,
+            "days_to_cancellation_deadline": 30,
+            "escalation_level":            0,
+            "provider_name":               t.get("merchant_name") or t.get("name", "Unknown"),
+            "provider_category":           (t.get("category") or ["Other"])[0] if isinstance(t.get("category"), list) else t.get("category", "Other"),
+            "customer_segment":            "standard",
+            "severity":                    "low",
+            "event_name":                  t.get("name", ""),
+            "event_date":                  t.get("date", ""),
+            "recommended_strategy":        "monitor",
+            "action_status":               "pending",
+            "approval_status":             "approved",
+            "auto_renew_flag":             "Y",
+            "eligibility_status":          "eligible",
+            "state_code":                  t.get("location", {}).get("region", "Unknown") if isinstance(t.get("location"), dict) else "Unknown",
+            "country_code":                "US",
+            "pending":                     t.get("pending", False),
+            "payment_channel":             t.get("payment_channel", "other"),
+        })
+    return out
+
+
 class AnalyzeRequest(BaseModel):
     account_id: Optional[str] = None
     limit: Optional[int] = 500
+    transactions: Optional[List[Dict[str, Any]]] = None
 
 
 class TrainRequest(BaseModel):
@@ -59,11 +98,14 @@ def train_model(req: TrainRequest = TrainRequest()):
 @router.post("/analyze")
 def analyze_transactions(req: AnalyzeRequest = AnalyzeRequest()):
     try:
-        # Fetch transactions from CSV
-        transactions = get_transactions(
-            account_id=req.account_id if req.account_id and req.account_id != "ALL" else None,
-            limit=req.limit or 500,
-        )
+        # Use injected transactions (e.g. from Plaid) if provided, otherwise fall back to CSV
+        if req.transactions:
+            transactions = _normalize_plaid(req.transactions)[:(req.limit or 500)]
+        else:
+            transactions = get_transactions(
+                account_id=req.account_id if req.account_id and req.account_id != "ALL" else None,
+                limit=req.limit or 500,
+            )
 
         if not transactions:
             raise HTTPException(status_code=404, detail="No transactions found")

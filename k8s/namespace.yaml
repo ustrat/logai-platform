@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: valuepilot
+  labels:
+    app.kubernetes.io/managed-by: cloudformation
+    environment: production

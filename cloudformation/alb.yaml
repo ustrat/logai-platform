@@ -1,0 +1,189 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  ValuePilot === Application Load Balancer with:
+    - HTTP listener (port 80) = permanent redirect to HTTPS
+    - HTTPS listener (port 443) with TLS 1.2+ security policy
+    - Target group for the API service (port 4000)
+  Requires an ACM certificate issued in the same region.
+
+Parameters:
+  Environment:
+    Type: String
+    Default: production
+    AllowedValues: [development, staging, production]
+
+  AcmCertificateArn:
+    Type: String
+    Description: >
+      ARN of an ACM certificate for the API domain (e.g. api.valuepilot.com).
+      Request via: aws acm request-certificate --domain-name api.valuepilot.com
+      --validation-method DNS --region us-east-1
+    AllowedPattern: "arn:aws:acm:.*"
+    ConstraintDescription: Must be a valid ACM certificate ARN
+
+  ApiPort:
+    Type: Number
+    Default: 4000
+    Description: Container port the API service listens on
+
+  HealthCheckPath:
+    Type: String
+    Default: /health
+    Description: ALB health check path (must return HTTP 200)
+
+  IdleTimeoutSeconds:
+    Type: Number
+    Default: 60
+    Description: ALB idle connection timeout
+
+  # ====== TLS policy ====================================================================================================================================================================================
+  # ELBSecurityPolicy-TLS13-1-2-2021-06:
+  #   Supports TLS 1.2 and 1.3 (1.3 preferred).
+  #   Cipher suites include ECDHE-based forward secrecy only.
+  #   FedRAMP SC-8, SC-13 compliant.
+  TlsSecurityPolicy:
+    Type: String
+    Default: ELBSecurityPolicy-TLS13-1-2-2021-06
+    AllowedValues:
+      - ELBSecurityPolicy-TLS13-1-2-2021-06
+      - ELBSecurityPolicy-TLS-1-2-Ext-2018-06
+      - ELBSecurityPolicy-FS-1-2-Res-2020-10
+    Description: >
+      TLS policy applied to the HTTPS listener.
+      TLS13-1-2-2021-06 is recommended === enforces TLS 1.2 minimum with
+      TLS 1.3 support and forward-secrecy cipher suites only.
+
+Resources:
+
+  # ====== ALB ======================================================================================================================================================================================================
+  LoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Sub valuepilot-${Environment}-alb
+      Type: application
+      Scheme: internet-facing
+      IpAddressType: ipv4
+      Subnets:
+        - Fn::ImportValue: !Sub "valuepilot-${Environment}-public-subnet-1-id"
+        - Fn::ImportValue: !Sub "valuepilot-${Environment}-public-subnet-2-id"
+      SecurityGroups:
+        - Fn::ImportValue: !Sub "valuepilot-${Environment}-alb-sg-id"
+      LoadBalancerAttributes:
+        - Key: idle_timeout.timeout_seconds
+          Value: !Sub "${IdleTimeoutSeconds}"
+        # Drop invalid HTTP headers (security hardening)
+        - Key: routing.http.drop_invalid_header_fields.enabled
+          Value: "true"
+        # Enable HTTP/2
+        - Key: routing.http2.enabled
+          Value: "true"
+      Tags:
+        - Key: Project
+          Value: ValuePilot
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  # ====== Target group (API containers) ========================================================================================================================
+  ApiTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub valuepilot-${Environment}-api-tg
+      VpcId:
+        Fn::ImportValue: !Sub "valuepilot-${Environment}-vpc-id"
+      Protocol: HTTP
+      Port: !Ref ApiPort
+      TargetType: ip
+      HealthCheckEnabled: true
+      HealthCheckProtocol: HTTP
+      HealthCheckPath: !Ref HealthCheckPath
+      HealthCheckIntervalSeconds: 30
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 3
+      Matcher:
+        HttpCode: "200"
+      TargetGroupAttributes:
+        - Key: deregistration_delay.timeout_seconds
+          Value: "30"
+        - Key: stickiness.enabled
+          Value: "false"
+      Tags:
+        - Key: Project
+          Value: ValuePilot
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  # ====== HTTP listener = permanent HTTPS redirect =======================================================================================
+  HttpListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref LoadBalancer
+      Protocol: HTTP
+      Port: 80
+      DefaultActions:
+        - Type: redirect
+          RedirectConfig:
+            Protocol: HTTPS
+            Port: "443"
+            StatusCode: HTTP_301
+            Host: "#{host}"
+            Path: "/#{path}"
+            Query: "#{query}"
+
+  # ====== HTTPS listener = API target group, TLS 1.2+ ==============================================================================
+  HttpsListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref LoadBalancer
+      Protocol: HTTPS
+      Port: 443
+      SslPolicy: !Ref TlsSecurityPolicy
+      Certificates:
+        - CertificateArn: !Ref AcmCertificateArn
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref ApiTargetGroup
+
+  # ====== Listener rule: health check bypass (no auth required) ================================================
+  HealthCheckListenerRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      ListenerArn: !Ref HttpsListener
+      Priority: 1
+      Conditions:
+        - Field: path-pattern
+          Values: ["/health"]
+      Actions:
+        - Type: forward
+          TargetGroupArn: !Ref ApiTargetGroup
+
+Outputs:
+  LoadBalancerArn:
+    Value: !Ref LoadBalancer
+    Export:
+      Name: !Sub "valuepilot-${Environment}-alb-arn"
+  LoadBalancerDnsName:
+    Value: !GetAtt LoadBalancer.DNSName
+    Description: >
+      Point your api.valuepilot.com CNAME (or Route 53 alias) at this value.
+    Export:
+      Name: !Sub "valuepilot-${Environment}-alb-dns"
+  LoadBalancerHostedZoneId:
+    Value: !GetAtt LoadBalancer.CanonicalHostedZoneID
+    Description: Use this as the alias hosted zone ID in Route 53.
+    Export:
+      Name: !Sub "valuepilot-${Environment}-alb-hosted-zone-id"
+  ApiTargetGroupArn:
+    Value: !Ref ApiTargetGroup
+    Description: Register ECS/EKS task IPs as targets in this group.
+    Export:
+      Name: !Sub "valuepilot-${Environment}-api-target-group-arn"
+  HttpsListenerArn:
+    Value: !Ref HttpsListener
+    Description: Add additional listener rules (WAF, path-based routing) to this ARN.
+    Export:
+      Name: !Sub "valuepilot-${Environment}-https-listener-arn"

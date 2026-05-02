@@ -272,7 +272,7 @@ function OrderWizard({ onClose }: { onClose: () => void }) {
                       {c.orgType === 'federal' ? <Shield size={14} color="#7c3aed" /> : <Globe size={14} color="#0891b2" />}
                     </div>
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 13, color: '#fff', fontWeight: 600 }}>{c.name}</div>
+                      <div style={{ fontSize: 13, color: 'var(--text-primary)', fontWeight: 600 }}>{c.name}</div>
                       <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{c.billingEmail} · {c.country}</div>
                     </div>
                     <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 3, background: c.orgType === 'federal' ? 'rgba(124,58,237,0.1)' : 'rgba(8,145,178,0.1)', color: c.orgType === 'federal' ? '#7c3aed' : '#0891b2' }}>
@@ -291,7 +291,7 @@ function OrderWizard({ onClose }: { onClose: () => void }) {
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
               <span style={{ fontSize: 10, letterSpacing: '1.5px', color: 'var(--text-muted)' }}>LINE ITEMS</span>
-              <button onClick={addLine} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px', background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text-muted)', cursor: 'pointer', fontSize: 11 }}>
+              <button onClick={addLine} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px', background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text-muted)', cursor: 'pointer', fontSize: 11 }}>
                 <Plus size={11} /> Add Line
               </button>
             </div>
@@ -311,17 +311,17 @@ function OrderWizard({ onClose }: { onClose: () => void }) {
                 <div key={i} style={{ marginBottom: 8 }}>
                   <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr 72px 80px 56px 64px 30px', gap: 6, alignItems: 'center' }}>
                     <select value={item.product} onChange={e => setLine(i, 'product', e.target.value)}
-                      style={{ padding: '6px 8px', background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)', borderRadius: 4, color: '#fff', fontSize: 11 }}>
+                      style={{ padding: '6px 8px', background: 'var(--bg-base)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text-primary)', fontSize: 11 }}>
                       {VP_PRODUCTS.map(p => <option key={p} value={p}>{p}</option>)}
                     </select>
                     <input value={item.description} onChange={e => setLine(i, 'description', e.target.value)}
-                      placeholder="Description" style={{ padding: '6px 8px', background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)', borderRadius: 4, color: '#fff', fontSize: 11 }} />
+                      placeholder="Description" style={{ padding: '6px 8px', background: 'var(--bg-base)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text-primary)', fontSize: 11 }} />
                     <input type="number" min={1} value={item.seats} onChange={e => setLine(i, 'seats', parseInt(e.target.value) || 0)}
-                      style={{ padding: '6px 8px', background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)', borderRadius: 4, color: '#fff', fontSize: 11, textAlign: 'right' }} />
+                      style={{ padding: '6px 8px', background: 'var(--bg-base)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text-primary)', fontSize: 11, textAlign: 'right' }} />
                     <input type="number" min={0} step={1} value={item.unitPrice} onChange={e => setLine(i, 'unitPrice', parseFloat(e.target.value) || 0)}
-                      style={{ padding: '6px 8px', background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)', borderRadius: 4, color: '#fff', fontSize: 11, textAlign: 'right' }} />
+                      style={{ padding: '6px 8px', background: 'var(--bg-base)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text-primary)', fontSize: 11, textAlign: 'right' }} />
                     <select value={item.term} onChange={e => setLine(i, 'term', parseInt(e.target.value))}
-                      style={{ padding: '6px 4px', background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)', borderRadius: 4, color: '#fff', fontSize: 11 }}>
+                      style={{ padding: '6px 4px', background: 'var(--bg-base)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text-primary)', fontSize: 11 }}>
                       {[1,2,3,5].map(t => <option key={t} value={t}>{t}yr</option>)}
                     </select>
                     <input type="number" min={0} max={100} value={item.discount} onChange={e => setLine(i, 'discount', parseFloat(e.target.value) || 0)}
@@ -350,7 +350,7 @@ function OrderWizard({ onClose }: { onClose: () => void }) {
                     <span>Discount</span><span>− {fmt(totals.discount)}</span>
                   </div>
                 </>}
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, fontWeight: 800, color: '#fff', borderTop: totals.discount > 0 ? '1px solid var(--border)' : 'none', paddingTop: totals.discount > 0 ? 8 : 0 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, fontWeight: 800, color: 'var(--text-primary)', borderTop: totals.discount > 0 ? '1px solid var(--border)' : 'none', paddingTop: totals.discount > 0 ? 8 : 0 }}>
                   <span>TOTAL</span><span style={{ color: '#f59e0b' }}>{fmt(totals.grand)}</span>
                 </div>
               </div>
@@ -365,12 +365,12 @@ function OrderWizard({ onClose }: { onClose: () => void }) {
             <div style={{ marginBottom: 14 }}>
               <div style={{ fontSize: 9, letterSpacing: '1.5px', color: 'var(--text-muted)', marginBottom: 6 }}>NOTES (VISIBLE ON INVOICE)</div>
               <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3} placeholder="Special terms, support SLA, compliance requirements…"
-                style={{ width: '100%', padding: '8px 10px', background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)', borderRadius: 4, color: '#fff', fontSize: 12, resize: 'vertical', boxSizing: 'border-box' }} />
+                style={{ width: '100%', padding: '8px 10px', background: 'var(--bg-base)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text-primary)', fontSize: 12, resize: 'vertical', boxSizing: 'border-box' }} />
             </div>
             <div>
               <div style={{ fontSize: 9, letterSpacing: '1.5px', color: 'var(--text-muted)', marginBottom: 6 }}>INTERNAL NOTES (NOT ON INVOICE)</div>
               <textarea value={internalNotes} onChange={e => setInternalNotes(e.target.value)} rows={2} placeholder="Deal context, approval notes, sales strategy…"
-                style={{ width: '100%', padding: '8px 10px', background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)', borderRadius: 4, color: '#fff', fontSize: 12, resize: 'vertical', boxSizing: 'border-box' }} />
+                style={{ width: '100%', padding: '8px 10px', background: 'var(--bg-base)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text-primary)', fontSize: 12, resize: 'vertical', boxSizing: 'border-box' }} />
             </div>
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 16, cursor: 'pointer' }}>
               <input type="checkbox" checked={submitAfter} onChange={e => setSubmitAfter(e.target.checked)} />
@@ -382,11 +382,11 @@ function OrderWizard({ onClose }: { onClose: () => void }) {
         {/* Step 3 — Review */}
         {step === 3 && selectedCustomer && (
           <div>
-            <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border)', borderRadius: 6, overflow: 'hidden', marginBottom: 14 }}>
+            <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 6, overflow: 'hidden', marginBottom: 14 }}>
               <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10 }}>
                 {selectedCustomer.orgType === 'federal' ? <Shield size={14} color="#7c3aed" /> : <Globe size={14} color="#0891b2" />}
                 <div>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>{selectedCustomer.name}</div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{selectedCustomer.name}</div>
                   <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{selectedCustomer.billingEmail}</div>
                 </div>
               </div>
@@ -406,10 +406,10 @@ function OrderWizard({ onClose }: { onClose: () => void }) {
                       const total = base - base * (item.discount / 100);
                       return (
                         <tr key={i}>
-                          <td style={{ padding: '5px 0', fontSize: 12, color: '#fff' }}>{item.product}</td>
+                          <td style={{ padding: '5px 0', fontSize: 12, color: 'var(--text-primary)' }}>{item.product}</td>
                           <td style={{ padding: '5px 0', fontSize: 12, color: 'var(--text-muted)', textAlign: 'center' }}>{item.seats.toLocaleString()}</td>
                           <td style={{ padding: '5px 0', fontSize: 12, color: 'var(--text-muted)', textAlign: 'center' }}>{item.term}yr</td>
-                          <td style={{ padding: '5px 0', fontSize: 12, color: '#fff', textAlign: 'right', fontWeight: 600 }}>{fmt(total)}</td>
+                          <td style={{ padding: '5px 0', fontSize: 12, color: 'var(--text-primary)', textAlign: 'right', fontWeight: 600 }}>{fmt(total)}</td>
                         </tr>
                       );
                     })}
@@ -467,12 +467,12 @@ function ApprovalModal({ order, onClose }: { order: Order; onClose: () => void }
     <Modal title="APPROVAL REVIEW" onClose={onClose} width={480}>
       <div style={{ marginBottom: 16 }}>
         <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>ORDER</div>
-        <div style={{ fontSize: 15, fontWeight: 700, color: '#fff' }}>{order.orderNumber} — {order.customerName}</div>
+        <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>{order.orderNumber} — {order.customerName}</div>
         <div style={{ fontSize: 13, color: '#f59e0b', fontWeight: 700, marginTop: 4 }}>{fmt(order.grandTotal)}</div>
       </div>
 
-      <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border)', borderRadius: 4, padding: '10px 14px', marginBottom: 16, fontSize: 11, color: 'var(--text-muted)' }}>
-        Stage: <strong style={{ color: '#fff' }}>{stageLabel}</strong> · Approving moves this to <strong style={{ color: '#22c55e' }}>{nextLabel}</strong>
+      <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 4, padding: '10px 14px', marginBottom: 16, fontSize: 11, color: 'var(--text-muted)' }}>
+        Stage: <strong style={{ color: 'var(--text-primary)' }}>{stageLabel}</strong> · Approving moves this to <strong style={{ color: '#22c55e' }}>{nextLabel}</strong>
       </div>
 
       <div style={{ marginBottom: 16 }}>
@@ -490,7 +490,7 @@ function ApprovalModal({ order, onClose }: { order: Order; onClose: () => void }
       <div style={{ marginBottom: 20 }}>
         <div style={{ fontSize: 9, letterSpacing: '1.5px', color: 'var(--text-muted)', marginBottom: 6 }}>COMMENT {action === 'reject' ? '(REQUIRED)' : '(OPTIONAL)'}</div>
         <textarea value={comment} onChange={e => setComment(e.target.value)} rows={3} placeholder="Enter your reasoning, conditions, or notes…"
-          style={{ width: '100%', padding: '8px 10px', background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)', borderRadius: 4, color: '#fff', fontSize: 12, resize: 'none', boxSizing: 'border-box' }} />
+          style={{ width: '100%', padding: '8px 10px', background: 'var(--bg-base)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text-primary)', fontSize: 12, resize: 'none', boxSizing: 'border-box' }} />
       </div>
 
       <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
@@ -544,8 +544,8 @@ function InvoiceModal({ order, customer, onClose }: { order: Order; customer?: C
 
   return (
     <Modal title="GENERATE INVOICE" onClose={onClose} width={460}>
-      <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border)', borderRadius: 6, padding: '12px 16px', marginBottom: 20 }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', marginBottom: 6 }}>{order.orderNumber} — {order.customerName}</div>
+      <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 6, padding: '12px 16px', marginBottom: 20 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6 }}>{order.orderNumber} — {order.customerName}</div>
         {order.lineItems.map((item, i) => (
           <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text-muted)', marginBottom: 3 }}>
             <span>{item.product} × {item.seats.toLocaleString()} seats ({item.term}yr)</span>
@@ -561,7 +561,7 @@ function InvoiceModal({ order, customer, onClose }: { order: Order; customer?: C
       <div style={{ marginBottom: 14 }}>
         <div style={{ fontSize: 9, letterSpacing: '1.5px', color: 'var(--text-muted)', marginBottom: 6 }}>DUE DATE (leave blank for {order.paymentTerms})</div>
         <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)}
-          style={{ padding: '7px 10px', background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)', borderRadius: 4, color: '#fff', fontSize: 12, width: '100%', boxSizing: 'border-box' }} />
+          style={{ padding: '7px 10px', background: 'var(--bg-base)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text-primary)', fontSize: 12, width: '100%', boxSizing: 'border-box' }} />
       </div>
 
       <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 8 }}>
@@ -598,7 +598,7 @@ function OrderPanel({ orderId, onClose }: { orderId: string; onClose: () => void
 
   if (detailQ.isLoading) {
     return (
-      <div style={{ position: 'fixed', right: 0, top: 0, bottom: 0, width: 480, background: 'var(--bg-card)', borderLeft: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200 }}>
+      <div style={{ position: 'fixed', right: 0, top: 0, bottom: 0, width: 480, background: 'var(--bg-surface)', borderLeft: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200 }}>
         <Loader2 size={20} style={{ animation: 'spin 1s linear infinite' }} color="var(--text-muted)" />
       </div>
     );
@@ -612,11 +612,11 @@ function OrderPanel({ orderId, onClose }: { orderId: string; onClose: () => void
 
   return (
     <>
-      <div style={{ position: 'fixed', right: 0, top: 0, bottom: 0, width: 480, background: 'var(--bg-card)', borderLeft: '1px solid var(--border)', zIndex: 200, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
+      <div style={{ position: 'fixed', right: 0, top: 0, bottom: 0, width: 480, background: 'var(--bg-surface)', borderLeft: '1px solid var(--border)', zIndex: 200, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
         {/* Header */}
         <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
           <div>
-            <div style={{ fontSize: 14, fontWeight: 800, color: '#fff' }}>{order.orderNumber}</div>
+            <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--text-primary)' }}>{order.orderNumber}</div>
             <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{order.salesPersonEmail}</div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -629,19 +629,19 @@ function OrderPanel({ orderId, onClose }: { orderId: string; onClose: () => void
         <div style={{ padding: '20px', flex: 1 }}>
           {/* Customer */}
           <SectionTitle>CUSTOMER</SectionTitle>
-          <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border)', borderRadius: 6, padding: '12px 14px', marginBottom: 16 }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>{customer?.name}</div>
+          <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 6, padding: '12px 14px', marginBottom: 16 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{customer?.name}</div>
             <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{customer?.billingEmail}</div>
             {customer?.contractNumber && <div style={{ fontSize: 11, color: '#7c3aed', marginTop: 4 }}>Contract: {customer.contractNumber}</div>}
           </div>
 
           {/* Line items */}
           <SectionTitle>LINE ITEMS</SectionTitle>
-          <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border)', borderRadius: 6, overflow: 'hidden', marginBottom: 16 }}>
+          <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 6, overflow: 'hidden', marginBottom: 16 }}>
             {order.lineItems.map((item, i) => (
               <div key={i} style={{ padding: '10px 14px', borderBottom: i < order.lineItems.length - 1 ? '1px solid var(--border)' : 'none' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
-                  <span style={{ fontSize: 13, fontWeight: 600, color: '#fff' }}>{item.product}</span>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{item.product}</span>
                   <span style={{ fontSize: 13, fontWeight: 700, color: '#f59e0b' }}>{fmt(item.total)}</span>
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
@@ -662,7 +662,7 @@ function OrderPanel({ orderId, onClose }: { orderId: string; onClose: () => void
               <SectionTitle>INVOICE</SectionTitle>
               <div style={{ background: 'rgba(8,145,178,0.04)', border: '1px solid rgba(8,145,178,0.2)', borderRadius: 6, padding: '12px 14px', marginBottom: 16 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>{invoice.invoiceNumber}</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>{invoice.invoiceNumber}</span>
                   <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 3, background: invoice.status === 'paid' ? 'rgba(34,197,94,0.1)' : 'rgba(8,145,178,0.1)', color: invoice.status === 'paid' ? '#22c55e' : '#0891b2', fontWeight: 700 }}>{invoice.status.toUpperCase()}</span>
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Due: {new Date(invoice.dueDate).toLocaleDateString()} · {invoice.sentTo}</div>
@@ -680,7 +680,7 @@ function OrderPanel({ orderId, onClose }: { orderId: string; onClose: () => void
                   <div key={i} style={{ display: 'flex', gap: 10, padding: '8px 0', borderBottom: i < order.approvalHistory.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
                     <div style={{ width: 8, height: 8, borderRadius: '50%', background: entry.action === 'approved' ? '#22c55e' : entry.action === 'rejected' ? '#ef4444' : '#f59e0b', flexShrink: 0, marginTop: 4 }} />
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 11, color: '#fff' }}>{entry.comment}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-primary)' }}>{entry.comment}</div>
                       <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>{entry.actorEmail} · {new Date(entry.timestamp).toLocaleString()}</div>
                     </div>
                     <span style={{ fontSize: 9, color: entry.action === 'approved' ? '#22c55e' : entry.action === 'rejected' ? '#ef4444' : '#f59e0b', fontWeight: 700, textTransform: 'uppercase' }}>{entry.action}</span>
@@ -758,11 +758,17 @@ export default function EnterpriseSales() {
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24 }}>
         <div>
-          <h1 style={{ fontSize: 20, fontWeight: 800, color: '#fff', margin: '0 0 4px', letterSpacing: '0.5px' }}>Enterprise Sales</h1>
-          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Order pipeline · approval workflow · invoicing</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+            <div style={{ width: 32, height: 32, borderRadius: 8, background: 'linear-gradient(135deg, #f59e0b, #f97316)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <DollarSign size={16} color="#fff" />
+            </div>
+            <h1 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: 'var(--text-primary)' }}>Enterprise Sales</h1>
+            <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 4, background: 'var(--amber-dim)', color: 'var(--amber)', fontWeight: 600 }}>Order Pipeline</span>
+          </div>
+          <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)' }}>Order pipeline · approval workflow · invoicing</p>
         </div>
         <button onClick={() => setShowOrderWizard(true)}
-          style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 20px', background: '#f59e0b', border: 'none', borderRadius: 4, color: '#000', cursor: 'pointer', fontSize: 11, fontWeight: 800, letterSpacing: '0.5px' }}>
+          style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 20px', background: 'var(--amber)', border: 'none', borderRadius: 6, color: '#000', cursor: 'pointer', fontSize: 11, fontWeight: 800, letterSpacing: '0.5px' }}>
           <Plus size={13} /> NEW ORDER
         </button>
       </div>
@@ -776,16 +782,16 @@ export default function EnterpriseSales() {
           { label: 'INVOICED', value: stats?.counts.invoiced || 0, sub: fmt(stats?.revenue.invoiced || 0), color: '#0891b2' },
           { label: 'PAID', value: stats?.counts.paid || 0, sub: fmt(stats?.revenue.paid || 0), color: '#7c3aed' },
         ].map(s => (
-          <div key={s.label} style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '14px 16px', borderLeft: `3px solid ${s.color}` }}>
+          <div key={s.label} style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '14px 16px', borderLeft: `3px solid ${s.color}` }}>
             <div style={{ fontSize: 9, letterSpacing: '1.5px', color: 'var(--text-muted)', marginBottom: 6 }}>{s.label}</div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: '#fff', lineHeight: 1 }}>{s.value}</div>
+            <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1 }}>{s.value}</div>
             <div style={{ fontSize: 11, color: s.color, marginTop: 4 }}>{s.sub}</div>
           </div>
         ))}
       </div>
 
       {/* Pipeline stage bar */}
-      <div style={{ display: 'flex', gap: 0, background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '12px 20px', marginBottom: 20, alignItems: 'center', overflowX: 'auto' }}>
+      <div style={{ display: 'flex', gap: 0, background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '12px 20px', marginBottom: 20, alignItems: 'center', overflowX: 'auto' }}>
         {PIPELINE.map((p, i) => {
           const count = stats?.counts[p.status] || 0;
           const cfg = STATUS_CFG[p.status];
@@ -808,7 +814,7 @@ export default function EnterpriseSales() {
       </div>
 
       {/* Orders table */}
-      <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden' }}>
+      <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden' }}>
         {/* Table header */}
         <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr 1fr 140px 100px 100px', gap: 0, padding: '10px 16px', borderBottom: '1px solid var(--border)', background: 'rgba(255,255,255,0.02)' }}>
           {['ORDER #', 'CUSTOMER', 'PRODUCTS', 'TOTAL', 'STATUS', 'DATE'].map(h => (
@@ -829,12 +835,12 @@ export default function EnterpriseSales() {
         ) : (
           ordersQ.data?.map(order => (
             <div key={order.id} onClick={() => setSelectedOrderId(order.id)}
-              style={{ display: 'grid', gridTemplateColumns: '120px 1fr 1fr 140px 100px 100px', gap: 0, padding: '13px 16px', borderBottom: '1px solid rgba(255,255,255,0.04)', cursor: 'pointer', alignItems: 'center', transition: 'background 0.1s' }}
+              style={{ display: 'grid', gridTemplateColumns: '120px 1fr 1fr 140px 100px 100px', gap: 0, padding: '13px 16px', borderBottom: '1px solid var(--border)', cursor: 'pointer', alignItems: 'center', transition: 'background 0.1s' }}
               onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.02)')}
               onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
               <div style={{ fontSize: 12, fontWeight: 700, color: '#f59e0b', fontFamily: 'monospace' }}>{order.orderNumber}</div>
               <div>
-                <div style={{ fontSize: 12, color: '#fff', fontWeight: 600 }}>{order.customerName}</div>
+                <div style={{ fontSize: 12, color: 'var(--text-primary)', fontWeight: 600 }}>{order.customerName}</div>
                 <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 1 }}>{order.salesPersonEmail}</div>
               </div>
               <div>
@@ -845,7 +851,7 @@ export default function EnterpriseSales() {
                 ))}
               </div>
               <div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>{fmt(order.grandTotal)}</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>{fmt(order.grandTotal)}</div>
                 {order.totalDiscount > 0 && <div style={{ fontSize: 10, color: '#22c55e' }}>−{fmt(order.totalDiscount)} disc</div>}
               </div>
               <StatusPill status={order.status} />
@@ -868,9 +874,9 @@ export default function EnterpriseSales() {
 function Modal({ title, onClose, width, children }: { title: string; onClose: () => void; width: number; children: React.ReactNode }) {
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 500 }}>
-      <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8, padding: 28, width, maxWidth: '95vw', maxHeight: '92vh', overflowY: 'auto', boxShadow: '0 24px 64px rgba(0,0,0,0.6)' }}>
+      <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 8, padding: 28, width, maxWidth: '95vw', maxHeight: '92vh', overflowY: 'auto', boxShadow: '0 24px 64px rgba(0,0,0,0.6)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 22 }}>
-          <h3 style={{ fontSize: 13, fontWeight: 800, letterSpacing: '1.5px', color: '#fff', margin: 0 }}>{title}</h3>
+          <h3 style={{ fontSize: 13, fontWeight: 800, letterSpacing: '1.5px', color: 'var(--text-primary)', margin: 0 }}>{title}</h3>
           <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><X size={16} /></button>
         </div>
         {children}
@@ -906,7 +912,7 @@ function MF({ label, value, onChange, placeholder }: { label: string; value: str
     <div style={{ marginBottom: 12 }}>
       <div style={{ fontSize: 9, letterSpacing: '1.5px', color: 'var(--text-muted)', marginBottom: 5 }}>{label}</div>
       <input value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
-        style={{ width: '100%', padding: '7px 10px', background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)', borderRadius: 4, color: '#fff', fontSize: 12, boxSizing: 'border-box' }} />
+        style={{ width: '100%', padding: '7px 10px', background: 'var(--bg-base)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text-primary)', fontSize: 12, boxSizing: 'border-box' }} />
     </div>
   );
 }
@@ -916,7 +922,7 @@ function SelectF({ label, value, onChange, options }: { label: string; value: st
     <div style={{ marginBottom: 12 }}>
       <div style={{ fontSize: 9, letterSpacing: '1.5px', color: 'var(--text-muted)', marginBottom: 5 }}>{label}</div>
       <select value={value} onChange={e => onChange(e.target.value)}
-        style={{ width: '100%', padding: '7px 10px', background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)', borderRadius: 4, color: '#fff', fontSize: 12 }}>
+        style={{ width: '100%', padding: '7px 10px', background: 'var(--bg-base)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text-primary)', fontSize: 12 }}>
         {options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
       </select>
     </div>
@@ -925,9 +931,9 @@ function SelectF({ label, value, onChange, options }: { label: string; value: st
 
 function Row2({ label, value }: { label: string; value: string }) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: 12 }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderBottom: '1px solid var(--border)', fontSize: 12 }}>
       <span style={{ color: 'var(--text-muted)' }}>{label}</span>
-      <span style={{ color: '#fff', fontWeight: 500 }}>{value}</span>
+      <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{value}</span>
     </div>
   );
 }

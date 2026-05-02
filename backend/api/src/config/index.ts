@@ -1,12 +1,12 @@
 import 'dotenv/config';
+import { getSecrets } from '../lib/secretsManager';
 
 export const config = {
   port: parseInt(process.env.PORT || '4000'),
   nodeEnv: process.env.NODE_ENV || 'development',
 
-  jwt: {
-    secret: process.env.JWT_SECRET || 'dev_secret_change_in_prod',
-    expiresIn: process.env.JWT_EXPIRES_IN || '7d',
+  get jwt() {
+    return getSecrets().jwt;
   },
 
   database: {
@@ -15,6 +15,12 @@ export const config = {
 
   mlService: {
     url: process.env.ML_SERVICE_URL || 'http://localhost:8000',
+  },
+
+  cognito: {
+    region:     process.env.AWS_REGION        || 'us-east-1',
+    userPoolId: process.env.COGNITO_USER_POOL_ID || '',
+    clientId:   process.env.COGNITO_CLIENT_ID    || '',
   },
 
   rateLimit: {

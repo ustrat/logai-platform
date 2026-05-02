@@ -1,0 +1,103 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: ValuePilot — S3 buckets (email intelligence + SAM artifacts)
+
+Parameters:
+  Environment:
+    Type: String
+    Default: production
+    AllowedValues: [development, staging, production]
+
+Resources:
+
+  # ── Email Intelligence bucket ─────────────────────────────────────────────────
+  EmailIntelBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Sub valuepilot-email-intel-${Environment}
+      VersioningConfiguration:
+        Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - BucketKeyEnabled: true
+            ServerSideEncryptionByDefault:
+              SSEAlgorithm: aws:kms
+              KMSMasterKeyID:
+                Fn::ImportValue:
+                  Fn::Sub: "valuepilot-${Environment}-s3-cmk-arn"
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: expire-old-insights
+            Status: Enabled
+            Prefix: insights/
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 90
+          - Id: expire-old-connections
+            Status: Enabled
+            Prefix: connections/
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 365
+      Tags:
+        - Key: Project
+          Value: ValuePilot
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  # ── SAM deployment artifacts bucket ──────────────────────────────────────────
+  SamArtifactsBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Sub "valuepilot-sam-artifacts-${AWS::AccountId}-${AWS::Region}"
+      VersioningConfiguration:
+        Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - BucketKeyEnabled: true
+            ServerSideEncryptionByDefault:
+              SSEAlgorithm: aws:kms
+              KMSMasterKeyID:
+                Fn::ImportValue:
+                  Fn::Sub: "valuepilot-${Environment}-s3-cmk-arn"
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: expire-old-artifacts
+            Status: Enabled
+            Prefix: ""
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 90
+      Tags:
+        - Key: Project
+          Value: ValuePilot
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: CloudFormation
+
+Outputs:
+  EmailIntelBucketName:
+    Value: !Ref EmailIntelBucket
+    Export:
+      Name: !Sub "valuepilot-${Environment}-email-intel-bucket-name"
+  EmailIntelBucketArn:
+    Value: !GetAtt EmailIntelBucket.Arn
+    Export:
+      Name: !Sub "valuepilot-${Environment}-email-intel-bucket-arn"
+  SamArtifactsBucketName:
+    Value: !Ref SamArtifactsBucket
+    Export:
+      Name: !Sub "valuepilot-${Environment}-sam-artifacts-bucket-name"

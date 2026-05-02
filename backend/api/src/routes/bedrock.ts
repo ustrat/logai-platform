@@ -1,10 +1,14 @@
 import { Router, type Request, type Response } from 'express';
+import { randomUUID } from 'crypto';
 import { analyzeEmailSignals }    from '../services/emailSignalBedrock.js';
 import { explainAnomalies }        from '../services/anomalyExplainer.js';
 import { analyzeSubscriptions }    from '../services/subscriptionAnalyzer.js';
 import { assist, assistStream }    from '../services/enterpriseAssistant.js';
+import { logEvent }                from '../lib/dynamoLogger.js';
+import { authenticate }            from '../middleware/auth.js';
 
 const router = Router();
+router.use(authenticate);
 
 // ── GET /api/v1/bedrock/status ────────────────────────────────────────────────
 router.get('/status', (_req: Request, res: Response) => {
@@ -34,6 +38,11 @@ router.post('/email-signals', async (req: Request, res: Response) => {
 
   try {
     const result = await analyzeEmailSignals(subject, from, body);
+    logEvent('ml-inference', `USER#${(req as any).user?.userId ?? 'unknown'}`, `BEDROCK#${new Date().toISOString()}`, {
+      inferenceId: randomUUID(), eventType: 'email-signals', topSeverity: 'unknown', modelVersion: 'bedrock',
+      userId: (req as any).user?.userId ?? 'unknown', email: (req as any).user?.email ?? 'unknown',
+      inputTokens: (result as any).inputTokens ?? 0, outputTokens: (result as any).outputTokens ?? 0,
+    }).catch(() => {});
     res.json(result);
   } catch (err: any) {
     console.error('[bedrock/email-signals]', err);
@@ -53,6 +62,11 @@ router.post('/anomaly-explain', async (req: Request, res: Response) => {
 
   try {
     const result = await explainAnomalies(anomalies, recommendations, transactions ?? [], accountId);
+    logEvent('ml-inference', `USER#${(req as any).user?.userId ?? 'unknown'}`, `BEDROCK#${new Date().toISOString()}`, {
+      inferenceId: randomUUID(), eventType: 'anomaly-explain', accountId, topSeverity: 'unknown', modelVersion: 'bedrock',
+      userId: (req as any).user?.userId ?? 'unknown', email: (req as any).user?.email ?? 'unknown',
+      inputTokens: (result as any).inputTokens ?? 0, outputTokens: (result as any).outputTokens ?? 0,
+    }).catch(() => {});
     res.json(result);
   } catch (err: any) {
     console.error('[bedrock/anomaly-explain]', err);
@@ -72,6 +86,12 @@ router.post('/subscription-analyze', async (req: Request, res: Response) => {
 
   try {
     const result = await analyzeSubscriptions(subscriptions, userId);
+    logEvent('ml-inference', `USER#${(req as any).user?.userId ?? userId}`, `BEDROCK#${new Date().toISOString()}`, {
+      inferenceId: randomUUID(), eventType: 'subscription-analyze', subscriptionCount: subscriptions.length,
+      topSeverity: 'unknown', modelVersion: 'bedrock',
+      userId: (req as any).user?.userId ?? userId, email: (req as any).user?.email ?? 'unknown',
+      inputTokens: (result as any).inputTokens ?? 0, outputTokens: (result as any).outputTokens ?? 0,
+    }).catch(() => {});
     res.json(result);
   } catch (err: any) {
     console.error('[bedrock/subscription-analyze]', err);
@@ -91,6 +111,11 @@ router.post('/enterprise/assist', async (req: Request, res: Response) => {
 
   try {
     const result = await assist({ task, context, instruction });
+    logEvent('ml-inference', `USER#${(req as any).user?.userId ?? 'unknown'}`, `BEDROCK#${new Date().toISOString()}`, {
+      inferenceId: randomUUID(), eventType: 'enterprise-assist', topSeverity: 'none', modelVersion: 'bedrock',
+      userId: (req as any).user?.userId ?? 'unknown', email: (req as any).user?.email ?? 'unknown',
+      inputTokens: (result as any).inputTokens ?? 0, outputTokens: (result as any).outputTokens ?? 0,
+    }).catch(() => {});
     res.json(result);
   } catch (err: any) {
     console.error('[bedrock/enterprise/assist]', err);

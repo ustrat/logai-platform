@@ -8,6 +8,7 @@
 import { Router, Request, Response } from 'express';
 import { authenticate } from '../middleware/auth';
 import nodemailer from 'nodemailer';
+import { getSecrets } from '../lib/secretsManager';
 import fs from 'fs';
 import path from 'path';
 import { randomUUID } from 'crypto';
@@ -155,13 +156,13 @@ function computeOrder(lineItems: LineItem[]): { subtotal: number; totalDiscount:
 
 // ── Email ─────────────────────────────────────────────────────────────────────
 function getMailer() {
-  const host = process.env.SMTP_HOST;
-  if (!host) return null;
+  const smtp = getSecrets().smtp;
+  if (!smtp.host) return null;
   return nodemailer.createTransport({
-    host,
-    port: parseInt(process.env.SMTP_PORT || '587'),
-    secure: process.env.SMTP_SECURE === 'true',
-    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+    host: smtp.host,
+    port: parseInt(smtp.port),
+    secure: smtp.port === '465',
+    auth: { user: smtp.user, pass: smtp.pass },
   });
 }
 
@@ -294,7 +295,7 @@ async function sendInvoiceEmail(invoice: Invoice, customer: Customer, order: Ord
   }
 
   await mailer.sendMail({
-    from: `"ValuePilot Billing" <${process.env.SMTP_USER || 'billing@valuepilot.com'}>`,
+    from: `"ValuePilot Billing" <${getSecrets().smtp.user || 'billing@valuepilot.com'}>`,
     to:   invoice.sentTo,
     cc:   order.salesPersonEmail,
     subject: `Invoice ${invoice.invoiceNumber} — ${customer.name} ($${invoice.grandTotal.toLocaleString()})`,

@@ -1,0 +1,356 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  ValuePilot -- EKS cluster with managed node group in private subnets.
+  Includes IRSA OIDC provider and a scoped IAM role for the API service account.
+  Nodes have no direct internet inbound access; outbound via NAT Gateways.
+
+Parameters:
+  Environment:
+    Type: String
+    Default: production
+    AllowedValues: [development, staging, production]
+
+  KubernetesVersion:
+    Type: String
+    Default: "1.31"
+    Description: EKS control plane version
+
+  NodeInstanceType:
+    Type: String
+    Default: t3.medium
+    Description: EC2 instance type for worker nodes (2 vCPU / 4 GiB)
+
+  NodeCapacityType:
+    Type: String
+    Default: ON_DEMAND
+    AllowedValues: [ON_DEMAND, SPOT]
+    Description: ON_DEMAND for production stability; SPOT for dev/staging cost savings.
+
+  NodeDesiredCount:
+    Type: Number
+    Default: 2
+  NodeMinCount:
+    Type: Number
+    Default: 2
+  NodeMaxCount:
+    Type: Number
+    Default: 4
+
+  NodeDiskSizeGiB:
+    Type: Number
+    Default: 20
+
+  # CIDR blocks allowed to reach the public Kubernetes API endpoint.
+  # Set to your office/VPN CIDR or "" to make the endpoint private-only.
+  ApiPublicAccessCidrs:
+    Type: String
+    Default: "0.0.0.0/0"
+    Description: >
+      Comma-separated CIDRs that may reach the public EKS API endpoint
+      (used for kubectl from developer machines). Restrict to your VPN CIDR
+      for FedRAMP compliance once a bastion/VPN is in place.
+
+Resources:
+
+  # =========================================================================
+  # IAM: EKS control-plane role
+  # =========================================================================
+
+  ClusterRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub valuepilot-${Environment}-eks-cluster-role
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: eks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/AmazonEKSClusterPolicy"
+      Tags:
+        - Key: Project
+          Value: ValuePilot
+        - Key: Environment
+          Value: !Ref Environment
+
+  # =========================================================================
+  # IAM: EKS node group role (minimal -- workload permissions via IRSA)
+  # =========================================================================
+
+  NodeGroupRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub valuepilot-${Environment}-eks-node-role
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/AmazonEKSWorkerNodePolicy"
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/AmazonEKS_CNI_Policy"
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/AmazonSSMManagedInstanceCore"
+      Tags:
+        - Key: Project
+          Value: ValuePilot
+        - Key: Environment
+          Value: !Ref Environment
+
+  # =========================================================================
+  # EKS Cluster
+  # =========================================================================
+
+  EksCluster:
+    Type: AWS::EKS::Cluster
+    Properties:
+      Name: !Sub valuepilot-${Environment}
+      Version: !Ref KubernetesVersion
+      RoleArn: !GetAtt ClusterRole.Arn
+      ResourcesVpcConfig:
+        SubnetIds:
+          - Fn::ImportValue: !Sub "valuepilot-${Environment}-private-subnet-1-id"
+          - Fn::ImportValue: !Sub "valuepilot-${Environment}-private-subnet-2-id"
+          - Fn::ImportValue: !Sub "valuepilot-${Environment}-public-subnet-1-id"
+          - Fn::ImportValue: !Sub "valuepilot-${Environment}-public-subnet-2-id"
+        SecurityGroupIds:
+          - Fn::ImportValue: !Sub "valuepilot-${Environment}-app-sg-id"
+        EndpointPrivateAccess: true
+        EndpointPublicAccess: true
+        PublicAccessCidrs:
+          - !Ref ApiPublicAccessCidrs
+      Logging:
+        ClusterLogging:
+          EnabledTypes:
+            - Type: api
+            - Type: audit
+            - Type: authenticator
+            - Type: controllerManager
+            - Type: scheduler
+      Tags:
+        - Key: Project
+          Value: ValuePilot
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  # =========================================================================
+  # EKS Add-ons (installed after cluster is ready)
+  # =========================================================================
+
+  AddonCoreDns:
+    Type: AWS::EKS::Addon
+    DependsOn: EksNodeGroup
+    Properties:
+      ClusterName: !Ref EksCluster
+      AddonName: coredns
+      ResolveConflicts: OVERWRITE
+
+  AddonKubeProxy:
+    Type: AWS::EKS::Addon
+    Properties:
+      ClusterName: !Ref EksCluster
+      AddonName: kube-proxy
+      ResolveConflicts: OVERWRITE
+
+  AddonVpcCni:
+    Type: AWS::EKS::Addon
+    Properties:
+      ClusterName: !Ref EksCluster
+      AddonName: vpc-cni
+      ResolveConflicts: OVERWRITE
+
+  # =========================================================================
+  # EKS Managed Node Group -- private subnets only
+  # =========================================================================
+
+  EksNodeGroup:
+    Type: AWS::EKS::Nodegroup
+    Properties:
+      ClusterName: !Ref EksCluster
+      NodegroupName: !Sub valuepilot-${Environment}-nodes
+      NodeRole: !GetAtt NodeGroupRole.Arn
+      Subnets:
+        - Fn::ImportValue: !Sub "valuepilot-${Environment}-private-subnet-1-id"
+        - Fn::ImportValue: !Sub "valuepilot-${Environment}-private-subnet-2-id"
+      InstanceTypes:
+        - !Ref NodeInstanceType
+      AmiType: AL2_x86_64
+      CapacityType: !Ref NodeCapacityType
+      DiskSize: !Ref NodeDiskSizeGiB
+      ScalingConfig:
+        MinSize: !Ref NodeMinCount
+        MaxSize: !Ref NodeMaxCount
+        DesiredSize: !Ref NodeDesiredCount
+      UpdateConfig:
+        MaxUnavailable: 1
+      Labels:
+        role: worker
+        environment: !Ref Environment
+      Tags:
+        Project: ValuePilot
+        Environment: !Ref Environment
+        ManagedBy: CloudFormation
+
+  # =========================================================================
+  # IRSA: OIDC identity provider (enables pods to assume IAM roles directly)
+  # =========================================================================
+
+  OidcProvider:
+    Type: AWS::IAM::OIDCProvider
+    Properties:
+      Url: !GetAtt EksCluster.OpenIdConnectIssuerUrl
+      ClientIdList:
+        - sts.amazonaws.com
+      # Thumbprints for Amazon's OIDC root CA (both current values)
+      ThumbprintList:
+        - 9e99a48a9960b14926bb7f3b02e22da2b0ab7280
+        - 06b25927c42a721631c1efd9431e648fa62e1e39
+
+  # =========================================================================
+  # IRSA: API service account role
+  # Bound to: namespace=valuepilot, serviceaccount=api
+  # Grants the API pod its DynamoDB, Secrets Manager, and Bedrock permissions
+  # without giving those permissions to every process on the node.
+  # =========================================================================
+
+  ApiServiceAccountRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub valuepilot-${Environment}-api-sa-role
+      AssumeRolePolicyDocument: !Sub
+        - |
+          {
+            "Version": "2012-10-17",
+            "Statement": [{
+              "Effect": "Allow",
+              "Principal": {"Federated": "${OidcArn}"},
+              "Action": "sts:AssumeRoleWithWebIdentity",
+              "Condition": {
+                "StringEquals": {
+                  "${OidcIssuer}:sub": "system:serviceaccount:valuepilot:api",
+                  "${OidcIssuer}:aud": "sts.amazonaws.com"
+                }
+              }
+            }]
+          }
+        - OidcArn: !GetAtt OidcProvider.Arn
+          OidcIssuer: !Select [1, !Split ["//", !GetAtt EksCluster.OpenIdConnectIssuerUrl]]
+      Policies:
+        - PolicyName: api-dynamodb
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: DynamoAllLogTables
+                Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:GetItem
+                  - dynamodb:Query
+                  - dynamodb:BatchWriteItem
+                  - dynamodb:DeleteItem
+                Resource:
+                  - !Sub "arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/vp-*-log-${Environment}"
+                  - !Sub "arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/vp-*-log-${Environment}/index/*"
+                  - !Sub "arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/vp-entitlements-${Environment}"
+                  - !Sub "arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/vp-entitlements-${Environment}/index/*"
+                  - !Sub "arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/vp-ent-subscriptions-${Environment}"
+                  - !Sub "arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/vp-ent-subscriptions-${Environment}/index/*"
+                  - !Sub "arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/vp-catalog-${Environment}"
+              - Sid: DynamoKms
+                Effect: Allow
+                Action:
+                  - kms:Decrypt
+                  - kms:GenerateDataKey
+                  - kms:DescribeKey
+                Resource:
+                  Fn::ImportValue: !Sub "valuepilot-${Environment}-dynamodb-cmk-arn"
+        - PolicyName: api-secrets
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: ReadAppSecrets
+                Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                  - secretsmanager:DescribeSecret
+                Resource: !Sub "arn:${AWS::Partition}:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:valuepilot/*"
+              - Sid: ReadSSMParams
+                Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                  - ssm:GetParameters
+                  - ssm:GetParametersByPath
+                Resource: !Sub "arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/valuepilot/*"
+        - PolicyName: api-eventbridge
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: PublishEntitlementEvents
+                Effect: Allow
+                Action: events:PutEvents
+                Resource: !Sub "arn:${AWS::Partition}:events:${AWS::Region}:${AWS::AccountId}:event-bus/valuepilot-entitlement-events-${Environment}"
+        - PolicyName: api-bedrock
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: BedrockInvoke
+                Effect: Allow
+                Action:
+                  - bedrock:InvokeModel
+                  - bedrock:InvokeModelWithResponseStream
+                  - bedrock:Converse
+                  - bedrock:ConverseStream
+                Resource:
+                  - !Sub "arn:${AWS::Partition}:bedrock:*::foundation-model/anthropic.claude-sonnet-4-6"
+                  - !Sub "arn:${AWS::Partition}:bedrock:*::foundation-model/anthropic.claude-haiku-4-5-20251001"
+                  - !Sub "arn:${AWS::Partition}:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/us.anthropic.claude-sonnet-4-6"
+                  - !Sub "arn:${AWS::Partition}:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/us.anthropic.claude-haiku-4-5-20251001"
+              - Sid: PutMetrics
+                Effect: Allow
+                Action: cloudwatch:PutMetricData
+                Resource: "*"
+                Condition:
+                  StringEquals:
+                    cloudwatch:namespace: ValuePilot
+      Tags:
+        - Key: Project
+          Value: ValuePilot
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: CloudFormation
+
+Outputs:
+  ClusterName:
+    Value: !Ref EksCluster
+    Export:
+      Name: !Sub "valuepilot-${Environment}-eks-cluster-name"
+  ClusterArn:
+    Value: !GetAtt EksCluster.Arn
+    Export:
+      Name: !Sub "valuepilot-${Environment}-eks-cluster-arn"
+  ClusterEndpoint:
+    Value: !GetAtt EksCluster.Endpoint
+    Description: kubectl API server endpoint
+    Export:
+      Name: !Sub "valuepilot-${Environment}-eks-endpoint"
+  OidcProviderArn:
+    Value: !GetAtt OidcProvider.Arn
+    Export:
+      Name: !Sub "valuepilot-${Environment}-oidc-provider-arn"
+  ApiServiceAccountRoleArn:
+    Value: !GetAtt ApiServiceAccountRole.Arn
+    Description: Annotate the k8s ServiceAccount with this ARN for IRSA.
+    Export:
+      Name: !Sub "valuepilot-${Environment}-api-sa-role-arn"
+  NodeGroupRoleArn:
+    Value: !GetAtt NodeGroupRole.Arn
+    Export:
+      Name: !Sub "valuepilot-${Environment}-eks-node-role-arn"

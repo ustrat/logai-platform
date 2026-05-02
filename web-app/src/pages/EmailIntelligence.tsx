@@ -88,9 +88,9 @@ function ImapModal({ onClose }: { onClose: () => void }) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 500 }}>
-      <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8, padding: 28, width: 460 }}>
+      <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 8, padding: 28, width: 460 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 20 }}>
-          <h3 style={{ fontSize: 13, fontWeight: 800, letterSpacing: '1px', color: '#fff', margin: 0 }}>CONNECT VIA IMAP</h3>
+          <h3 style={{ fontSize: 13, fontWeight: 800, letterSpacing: '1px', color: 'var(--text-primary)', margin: 0 }}>CONNECT VIA IMAP</h3>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><X size={15} /></button>
         </div>
 
@@ -112,7 +112,7 @@ function ImapModal({ onClose }: { onClose: () => void }) {
             <input type={k === 'password' ? 'password' : 'text'} value={(form as any)[k]}
               onChange={e => setForm(f => ({ ...f, [k]: e.target.value }))}
               placeholder={k === 'host' ? 'imap.gmail.com' : k === 'user' ? 'you@gmail.com' : 'App password'}
-              style={{ width: '100%', padding: '7px 10px', background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)', borderRadius: 4, color: '#fff', fontSize: 12, boxSizing: 'border-box' }} />
+              style={{ width: '100%', padding: '7px 10px', background: 'var(--bg-base)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text-primary)', fontSize: 12, boxSizing: 'border-box' }} />
           </div>
         ))}
 
@@ -120,7 +120,7 @@ function ImapModal({ onClose }: { onClose: () => void }) {
           <div>
             <div style={{ fontSize: 9, letterSpacing: '1.5px', color: 'var(--text-muted)', marginBottom: 5 }}>PORT</div>
             <input type="number" value={form.port} onChange={e => setForm(f => ({ ...f, port: parseInt(e.target.value) }))}
-              style={{ width: '100%', padding: '7px 10px', background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)', borderRadius: 4, color: '#fff', fontSize: 12, boxSizing: 'border-box' }} />
+              style={{ width: '100%', padding: '7px 10px', background: 'var(--bg-base)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text-primary)', fontSize: 12, boxSizing: 'border-box' }} />
           </div>
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 18, cursor: 'pointer' }}>
             <input type="checkbox" checked={form.secure} onChange={e => setForm(f => ({ ...f, secure: e.target.checked }))} />
@@ -166,12 +166,12 @@ function SignalCard({ email, products, onStatusChange }: {
   const productMap = Object.fromEntries(products.map(p => [p.key, p]));
 
   return (
-    <div style={{ background: 'var(--bg-card)', border: `1px solid ${isNew ? 'rgba(245,158,11,0.2)' : 'var(--border)'}`, borderRadius: 6, marginBottom: 8, overflow: 'hidden' }}>
+    <div style={{ background: 'var(--bg-surface)', border: `1px solid ${isNew ? 'rgba(245,158,11,0.3)' : 'var(--border)'}`, borderRadius: 6, marginBottom: 8, overflow: 'hidden', boxShadow: 'var(--shadow-sm)' }}>
       {/* Header */}
       <div style={{ padding: '12px 16px', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
         <div style={{ width: 8, height: 8, borderRadius: '50%', background: STATUS_COLORS[email.status], flexShrink: 0, marginTop: 5 }} />
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{email.subject}</div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{email.subject}</div>
           <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{email.from} · {new Date(email.date).toLocaleDateString()}</div>
           {/* Product tags */}
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 8 }}>
@@ -204,16 +204,16 @@ function SignalCard({ email, products, onStatusChange }: {
           {topSignals.map((sig, i) => {
             const p = productMap[sig.productKey];
             return (
-              <div key={i} style={{ marginBottom: 10, padding: '8px 12px', background: 'rgba(255,255,255,0.02)', borderRadius: 4, borderLeft: `2px solid ${p?.accent || '#666'}` }}>
+              <div key={i} style={{ marginBottom: 10, padding: '8px 12px', background: 'var(--bg-base)', borderRadius: 4, borderLeft: `2px solid ${p?.accent || 'var(--border-bright)'}` }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                  <span style={{ fontSize: 10, fontWeight: 700, color: p?.accent || '#fff', letterSpacing: '0.5px' }}>{sig.signalType.replace(/_/g, ' ')}</span>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: p?.accent || 'var(--text-secondary)', letterSpacing: '0.5px' }}>{sig.signalType.replace(/_/g, ' ')}</span>
                   <span style={{ fontSize: 10, color: sig.confidence >= 0.9 ? '#22c55e' : sig.confidence >= 0.75 ? '#f59e0b' : '#94a3b8' }}>
                     {Math.round(sig.confidence * 100)}% confidence
                   </span>
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4, fontStyle: 'italic', lineHeight: 1.4 }}>"{sig.snippet}"</div>
                 {Object.entries(sig.extracted).filter(([, v]) => v !== undefined).map(([k, v]) => (
-                  <span key={k} style={{ fontSize: 10, marginRight: 10, color: '#94a3b8' }}>
+                  <span key={k} style={{ fontSize: 10, marginRight: 10, color: 'var(--text-secondary)' }}>
                     <span style={{ color: 'var(--text-muted)' }}>{k}:</span> {v}
                   </span>
                 ))}
@@ -242,9 +242,9 @@ function CorrelationMatrix({ data }: { data: Correlation }) {
           const topType = Object.entries(row.signalTypes).sort((a, b) => b[1] - a[1])[0];
 
           return (
-            <div key={product.key} style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 6, padding: '14px 16px', borderLeft: `3px solid ${product.accent}` }}>
+            <div key={product.key} style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 6, padding: '14px 16px', borderLeft: `3px solid ${product.accent}`, boxShadow: 'var(--shadow-sm)' }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: product.accent, marginBottom: 8 }}>{product.name}</div>
-              <div style={{ fontSize: 22, fontWeight: 800, color: '#fff', lineHeight: 1 }}>{row.count}</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1 }}>{row.count}</div>
               <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>signals detected</div>
 
               {/* Signal bar */}
@@ -357,15 +357,21 @@ export default function EmailIntelligence() {
   const products    = corr?.products || [];
 
   return (
-    <div style={{ padding: '24px 28px', maxWidth: 1100, margin: '0 auto' }}>
+    <div style={{ padding: 24, maxWidth: 1100, margin: '0 auto' }}>
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
         <div>
-          <h1 style={{ fontSize: 20, fontWeight: 800, color: '#fff', margin: '0 0 4px' }}>Email Intelligence</h1>
-          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Scan subscriber email for signals across all 7 ValuePilot products</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+            <div style={{ width: 32, height: 32, borderRadius: 8, background: 'linear-gradient(135deg, #0891b2, #22c55e)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Mail size={16} color="#fff" />
+            </div>
+            <h1 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: 'var(--text-primary)' }}>Email Intelligence</h1>
+            <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 4, background: 'rgba(8,145,178,0.1)', color: '#0891b2', fontWeight: 600 }}>Signal Intelligence</span>
+          </div>
+          <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)' }}>Scan subscriber email for signals across all 7 ValuePilot products</p>
         </div>
         <button onClick={() => scanMutation.mutate()} disabled={connections.length === 0 || scanMutation.isPending}
-          style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 18px', background: connections.length === 0 ? 'rgba(255,255,255,0.04)' : '#f59e0b', border: 'none', borderRadius: 4, color: connections.length === 0 ? 'var(--text-muted)' : '#000', cursor: connections.length === 0 ? 'default' : 'pointer', fontSize: 11, fontWeight: 800, letterSpacing: '0.5px' }}>
+          style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 18px', background: connections.length === 0 ? 'var(--bg-elevated)' : '#0891b2', border: 'none', borderRadius: 6, color: connections.length === 0 ? 'var(--text-muted)' : '#fff', cursor: connections.length === 0 ? 'default' : 'pointer', fontSize: 11, fontWeight: 700, letterSpacing: '0.5px' }}>
           {scanMutation.isPending ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Zap size={13} />}
           {scanMutation.isPending ? 'SCANNING...' : 'SCAN NOW'}
         </button>
@@ -389,7 +395,7 @@ export default function EmailIntelligence() {
       )}
 
       {/* Connected accounts */}
-      <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 6, padding: '16px 20px', marginBottom: 20 }}>
+      <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '16px 20px', marginBottom: 20, boxShadow: 'var(--shadow-sm)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
           <span style={{ fontSize: 10, letterSpacing: '1.5px', color: 'var(--text-muted)' }}>CONNECTED ACCOUNTS</span>
           <div style={{ display: 'flex', gap: 6 }}>
@@ -410,10 +416,10 @@ export default function EmailIntelligence() {
             {connections.map(conn => {
               const cfg = PROVIDER_CFG[conn.provider];
               return (
-                <div key={conn.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', background: 'rgba(255,255,255,0.03)', border: `1px solid ${conn.status === 'connected' ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)'}`, borderRadius: 6 }}>
+                <div key={conn.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', background: 'var(--bg-elevated)', border: `1px solid ${conn.status === 'connected' ? 'rgba(34,197,94,0.35)' : 'rgba(239,68,68,0.35)'}`, borderRadius: 6 }}>
                   <div style={{ width: 24, height: 24, borderRadius: 4, background: cfg.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, color: cfg.color }}>{cfg.icon}</div>
                   <div>
-                    <div style={{ fontSize: 12, color: '#fff', fontWeight: 600 }}>{conn.email}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-primary)', fontWeight: 600 }}>{conn.email}</div>
                     <div style={{ fontSize: 10, color: conn.status === 'connected' ? '#22c55e' : '#ef4444' }}>
                       {conn.status === 'connected' ? (conn.lastScanAt ? `Last scan ${new Date(conn.lastScanAt).toLocaleDateString()}` : 'Connected — not yet scanned') : conn.errorMessage || 'Error'}
                     </div>
@@ -496,9 +502,9 @@ export default function EmailIntelligence() {
                 { label: 'EMAILS SCANNED',  value: corr.totalEmailsScanned, color: '#0891b2' },
                 { label: 'NEW / UNREVIEWED', value: corr.newCount,          color: '#ef4444' },
               ].map(s => (
-                <div key={s.label} style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 6, padding: '14px 18px', borderLeft: `3px solid ${s.color}` }}>
+                <div key={s.label} style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 6, padding: '14px 18px', borderLeft: `3px solid ${s.color}`, boxShadow: 'var(--shadow-sm)' }}>
                   <div style={{ fontSize: 9, letterSpacing: '1.5px', color: 'var(--text-muted)', marginBottom: 6 }}>{s.label}</div>
-                  <div style={{ fontSize: 26, fontWeight: 800, color: '#fff' }}>{s.value}</div>
+                  <div style={{ fontSize: 26, fontWeight: 800, color: 'var(--text-primary)' }}>{s.value}</div>
                 </div>
               ))}
             </div>

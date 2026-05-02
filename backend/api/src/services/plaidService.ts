@@ -1,8 +1,7 @@
 import axios from 'axios';
+import { getSecrets } from '../lib/secretsManager';
 
 const PLAID_BASE_URL = 'https://sandbox.plaid.com'; // switch to https://development.plaid.com for real banks
-const PLAID_CLIENT_ID = process.env.PLAID_CLIENT_ID || '69c07819f69c58000c95f8fe';
-const PLAID_SECRET = process.env.PLAID_SECRET || '6f267634418c8aff85a9041f4d25e8';
 
 const plaidClient = axios.create({
   baseURL: PLAID_BASE_URL,
@@ -10,8 +9,8 @@ const plaidClient = axios.create({
 });
 
 const basePayload = () => ({
-  client_id: PLAID_CLIENT_ID,
-  secret: PLAID_SECRET,
+  client_id: getSecrets().plaid.clientId,
+  secret: getSecrets().plaid.secret,
 });
 
 export const plaidService = {
